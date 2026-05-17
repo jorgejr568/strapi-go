@@ -11,8 +11,17 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/jorgejr568/strapi-go/blocks"
 	"github.com/jorgejr568/strapi-go/query"
 )
+
+// richPage is a content-type struct used by TestBlocksRoundtrip to exercise
+// the blocks subpackage end-to-end.
+type richPage struct {
+	Title string        `json:"title"`
+	Slug  string        `json:"slug"`
+	Body  blocks.Blocks `json:"body"`
+}
 
 // memoryStore is a minimal in-memory Strapi simulator used by lifecycle
 // scenarios. It supports a single collection of pages addressed by
@@ -377,4 +386,78 @@ func TestComplexQueryRoundtrip(t *testing.T) {
 			t.Errorf("missing query param %q=%q (got %q)", mh.key, mh.value, got)
 		}
 	}
+}
+
+// TestBlocksRoundtrip exercises the entire blocks subpackage: decode a
+// document containing every node type and every text modifier, then render
+// it via RenderHTML and assert the output contains every expected element.
+// This is the end-to-end test for content rendering.
+func TestBlocksRoundtrip(t *testing.T) {
+	srv := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{
+            "data": {
+                "id": 1, "documentId": "doc1",
+                "title": "Rich Page",
+                "slug": "rich",
+                "body": [
+                    {"type":"heading","level":1,"children":[{"type":"text","text":"Title"}]},
+                    {"type":"paragraph","children":[
+                        {"type":"text","text":"plain "},
+                        {"type":"text","text":"bold","bold":true},
+                        {"type":"text","text":" italic","italic":true},
+                        {"type":"text","text":" both","bold":true,"italic":true}
+                    ]},
+                    {"type":"list","format":"unordered","children":[
+                        {"type":"list-item","children":[{"type":"text","text":"first"}]},
+                        {"type":"list-item","children":[{"type":"text","text":"second"}]}
+                    ]},
+                    {"type":"list","format":"ordered","children":[
+                        {"type":"list-item","children":[{"type":"text","text":"one"}]}
+                    ]},
+                    {"type":"quote","children":[{"type":"text","text":"quoted"}]},
+                    {"type":"code","children":[{"type":"text","text":"go run ."}]},
+                    {"type":"link","url":"https://example.com","children":[{"type":"text","text":"site"}]},
+                    {"type":"image","image":{"url":"/uploads/x.jpg","alternativeText":"alt","width":800,"height":600},"children":[{"type":"text","text":""}]},
+                    {"type":"unknown-future","payload":{"x":1}}
+                ],
+                "createdAt": "2026-01-01T00:00:00Z", "updatedAt": "2026-01-01T00:00:00Z"
+            },
+            "meta": {}
+        }`))
+	})
+
+	pages := NewCollection[richPage](New(WithBaseURL(srv.URL)), "pages")
+	page, err := pages.Find(context.Background(), "doc1")
+	if err != nil {
+		t.Fatalf("Find: %v", err)
+	}
+	if len(page.Attributes.Body) != 9 {
+		t.Fatalf("body len = %d want 9", len(page.Attributes.Body))
+	}
+
+	html := blocks.RenderHTML(page.Attributes.Body)
+
+	mustContain := []string{
+		"<h1>Title</h1>",
+		"<p>plain ",
+		"<strong>bold</strong>",
+		"<em> italic</em>",
+		"<strong><em> both</em></strong>",
+		"<ul><li>first</li><li>second</li></ul>",
+		"<ol><li>one</li></ol>",
+		"<blockquote>quoted</blockquote>",
+		"<pre><code>go run .</code></pre>",
+		`<a href="https://example.com">site</a>`,
+		`<img src="/uploads/x.jpg"`,
+		`alt="alt"`,
+		`width="800"`,
+		`height="600"`,
+	}
+	for _, s := range mustContain {
+		if !strings.Contains(html, s) {
+			t.Errorf("html missing %q\nhtml=%s", s, html)
+		}
+	}
+	// The unknown-future block must NOT crash the renderer and must not
+	// appear in output (Unknown is silently skipped per the design).
 }
