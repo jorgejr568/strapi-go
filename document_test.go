@@ -74,3 +74,11 @@ func TestDocumentUnmarshalListWithNullPublishedAt(t *testing.T) {
 		t.Errorf("Total = %d want 2", env.Meta.Pagination.Total)
 	}
 }
+
+func TestDocumentUnmarshalReturnsErrorOnInvalidJSON(t *testing.T) {
+	var d Document[pageAttrs]
+	err := d.UnmarshalJSON([]byte(`{"id": "not a number"}`))
+	if err == nil {
+		t.Fatal("expected error for invalid id type, got nil")
+	}
+}

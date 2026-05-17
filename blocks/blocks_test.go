@@ -2,6 +2,7 @@ package blocks
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 )
 
@@ -176,5 +177,42 @@ func TestNodeInterfaceConformance(t *testing.T) {
 				t.Errorf("unhandled type %T", v.node)
 			}
 		})
+	}
+}
+
+func TestBlocksUnmarshalReturnsErrorOnNonArray(t *testing.T) {
+	var bs Blocks
+	err := bs.UnmarshalJSON([]byte(`{"not": "an array"}`))
+	if err == nil {
+		t.Fatal("expected error for non-array top level")
+	}
+}
+
+func TestBlocksUnmarshalWrapsPerNodeError(t *testing.T) {
+	// First node has a valid type but its body fails to decode (level expects int).
+	var bs Blocks
+	err := bs.UnmarshalJSON([]byte(`[{"type":"heading","level":"not a number"}]`))
+	if err == nil {
+		t.Fatal("expected error for invalid heading body")
+	}
+	if !strings.Contains(err.Error(), "blocks[0]") {
+		t.Errorf("error should be indexed with blocks[0]: %v", err)
+	}
+}
+
+func TestBlocksUnmarshalErrorOnInvalidNodeShape(t *testing.T) {
+	// Each item must be an object so the {"type":...} probe succeeds.
+	var bs Blocks
+	err := bs.UnmarshalJSON([]byte(`["a string, not an object"]`))
+	if err == nil {
+		t.Fatal("expected error for non-object element")
+	}
+}
+
+func TestListUnmarshalReturnsErrorOnInvalidShape(t *testing.T) {
+	var l List
+	err := l.UnmarshalJSON([]byte(`{"format": 123}`)) // format must be string
+	if err == nil {
+		t.Fatal("expected error for invalid list format type")
 	}
 }
