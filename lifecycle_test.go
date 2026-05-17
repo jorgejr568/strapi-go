@@ -460,4 +460,10 @@ func TestBlocksRoundtrip(t *testing.T) {
 	}
 	// The unknown-future block must NOT crash the renderer and must not
 	// appear in output (Unknown is silently skipped per the design).
+	// Negative assertions: the unknown-future block must NOT appear in output.
+	for _, forbidden := range []string{"unknown-future", `"x":1`} {
+		if strings.Contains(html, forbidden) {
+			t.Errorf("html should not contain %q\nhtml=%s", forbidden, html)
+		}
+	}
 }
