@@ -82,3 +82,17 @@ func TestDocumentUnmarshalReturnsErrorOnInvalidJSON(t *testing.T) {
 		t.Fatal("expected error for invalid id type, got nil")
 	}
 }
+
+func TestDocumentPathIDV5UsesDocumentID(t *testing.T) {
+	d := Document[pageAttrs]{ID: 1, DocumentID: "doc-abc"}
+	if got := d.PathID(); got != "doc-abc" {
+		t.Errorf("PathID() = %q want %q", got, "doc-abc")
+	}
+}
+
+func TestDocumentPathIDV4FallsBackToID(t *testing.T) {
+	d := Document[pageAttrs]{ID: 42, DocumentID: ""}
+	if got := d.PathID(); got != "42" {
+		t.Errorf("PathID() = %q want %q", got, "42")
+	}
+}

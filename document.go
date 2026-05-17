@@ -2,6 +2,7 @@ package strapi
 
 import (
 	"encoding/json"
+	"strconv"
 	"time"
 )
 
@@ -42,6 +43,18 @@ func (d *Document[T]) UnmarshalJSON(data []byte) error {
 	d.PublishedAt = sys.PublishedAt
 	d.Locale = sys.Locale
 	return json.Unmarshal(data, &d.Attributes)
+}
+
+// PathID returns the URL path identifier appropriate for the API version of
+// the response that produced this Document. v5 entries are addressed by
+// DocumentID; v4 entries (which have no DocumentID) fall back to the
+// stringified numeric ID. This lets callers chain CRUD operations without
+// branching on API version themselves.
+func (d *Document[T]) PathID() string {
+	if d.DocumentID != "" {
+		return d.DocumentID
+	}
+	return strconv.Itoa(d.ID)
 }
 
 // ListResponse is the envelope for collection-list responses. It is the
