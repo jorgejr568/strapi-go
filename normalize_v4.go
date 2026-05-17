@@ -41,6 +41,14 @@ func walkV4(v any) any {
 		for k, val := range x {
 			normalized[k] = walkV4(val)
 		}
+		// Relation envelope: single-key {data: <entry|[entries]|null>}.
+		// v4 wraps populated relations and media this way; v5 inlines.
+		if len(normalized) == 1 {
+			if data, ok := normalized["data"]; ok {
+				return data
+			}
+		}
+		// Entry envelope: {id, attributes: <object>, ...}. Lift attributes.
 		if attrs, ok := normalized["attributes"].(map[string]any); ok {
 			if _, hasID := normalized["id"]; hasID {
 				merged := make(map[string]any, len(normalized)+len(attrs)-1)

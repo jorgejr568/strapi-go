@@ -47,3 +47,77 @@ func TestNormalizeV4SingleEntry(t *testing.T) {
 	}
 	assertJSONEqual(t, got, want)
 }
+
+func TestNormalizeV4SingleRelationEnvelope(t *testing.T) {
+	in := []byte(`{
+		"data": {
+			"id": 1,
+			"attributes": {
+				"title": "Home",
+				"author": { "data": { "id": 5, "attributes": { "name": "Alice" } } }
+			}
+		}
+	}`)
+	want := []byte(`{
+		"data": {
+			"id": 1,
+			"title": "Home",
+			"author": { "id": 5, "name": "Alice" }
+		}
+	}`)
+	got, err := normalizeV4ToV5(in)
+	if err != nil {
+		t.Fatalf("normalize: %v", err)
+	}
+	assertJSONEqual(t, got, want)
+}
+
+func TestNormalizeV4ArrayRelationEnvelope(t *testing.T) {
+	in := []byte(`{
+		"data": {
+			"id": 1,
+			"attributes": {
+				"tags": { "data": [
+					{ "id": 7, "attributes": { "name": "go" } },
+					{ "id": 8, "attributes": { "name": "rest" } }
+				] }
+			}
+		}
+	}`)
+	want := []byte(`{
+		"data": {
+			"id": 1,
+			"tags": [
+				{ "id": 7, "name": "go" },
+				{ "id": 8, "name": "rest" }
+			]
+		}
+	}`)
+	got, err := normalizeV4ToV5(in)
+	if err != nil {
+		t.Fatalf("normalize: %v", err)
+	}
+	assertJSONEqual(t, got, want)
+}
+
+func TestNormalizeV4NullRelationEnvelope(t *testing.T) {
+	in := []byte(`{
+		"data": {
+			"id": 1,
+			"attributes": {
+				"author": { "data": null }
+			}
+		}
+	}`)
+	want := []byte(`{
+		"data": {
+			"id": 1,
+			"author": null
+		}
+	}`)
+	got, err := normalizeV4ToV5(in)
+	if err != nil {
+		t.Fatalf("normalize: %v", err)
+	}
+	assertJSONEqual(t, got, want)
+}
