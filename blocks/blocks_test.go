@@ -105,3 +105,76 @@ func TestBlocksUnknownTypeBecomesRaw(t *testing.T) {
 		t.Errorf("Type = %q", raw.Type)
 	}
 }
+
+func TestNodeInterfaceConformance(t *testing.T) {
+	// All concrete node types implement Node via an unexported nodeType()
+	// method. Sealed-interface pattern: external types can't satisfy Node.
+	// This test exercises each nodeType() to confirm the implementation
+	// signature is correct and the type is recognized at the interface.
+	values := []struct {
+		name string
+		node Node
+	}{
+		{"Text", Text{}},
+		{"Paragraph", Paragraph{}},
+		{"Heading", Heading{}},
+		{"List", List{}},
+		{"Quote", Quote{}},
+		{"Code", Code{}},
+		{"Link", Link{}},
+		{"Image", Image{}},
+		{"Unknown", Unknown{}},
+	}
+	for _, v := range values {
+		t.Run(v.name, func(t *testing.T) {
+			// Calling Node.nodeType through the interface forces the method-
+			// set check at runtime. The package-internal `nodeType` is reached
+			// because the test is in the same package.
+			if v.node == nil {
+				t.Fatal("nil Node")
+			}
+			_ = v.node // value's existence satisfies the static check
+			// Reach into the method directly to cover the line.
+			switch n := v.node.(type) {
+			case Text:
+				if n.nodeType() != "text" {
+					t.Errorf("Text.nodeType() = %q", n.nodeType())
+				}
+			case Paragraph:
+				if n.nodeType() != "paragraph" {
+					t.Errorf("Paragraph.nodeType() = %q", n.nodeType())
+				}
+			case Heading:
+				if n.nodeType() != "heading" {
+					t.Errorf("Heading.nodeType() = %q", n.nodeType())
+				}
+			case List:
+				if n.nodeType() != "list" {
+					t.Errorf("List.nodeType() = %q", n.nodeType())
+				}
+			case Quote:
+				if n.nodeType() != "quote" {
+					t.Errorf("Quote.nodeType() = %q", n.nodeType())
+				}
+			case Code:
+				if n.nodeType() != "code" {
+					t.Errorf("Code.nodeType() = %q", n.nodeType())
+				}
+			case Link:
+				if n.nodeType() != "link" {
+					t.Errorf("Link.nodeType() = %q", n.nodeType())
+				}
+			case Image:
+				if n.nodeType() != "image" {
+					t.Errorf("Image.nodeType() = %q", n.nodeType())
+				}
+			case Unknown:
+				if n.nodeType() != "unknown" {
+					t.Errorf("Unknown.nodeType() = %q", n.nodeType())
+				}
+			default:
+				t.Errorf("unhandled type %T", v.node)
+			}
+		})
+	}
+}
