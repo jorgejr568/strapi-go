@@ -105,6 +105,20 @@ func TestRenderHTMLTextModifiers(t *testing.T) {
 	}
 }
 
+func TestRenderHTMLParagraphWithInlineLink(t *testing.T) {
+	// Inline link inside a paragraph exercises writeInlines's *InlineLink branch
+	// and URL escaping.
+	got := renderFixture(t, `[{"type":"paragraph","children":[
+		{"type":"text","text":"see "},
+		{"type":"link","url":"https://example.com/?q=1&x=2","children":[{"type":"text","text":"docs","bold":true}]},
+		{"type":"text","text":" please"}
+	]}]`)
+	want := `<p>see <a href="https://example.com/?q=1&amp;x=2"><strong>docs</strong></a> please</p>`
+	if got != want {
+		t.Errorf("got %q want %q", got, want)
+	}
+}
+
 func TestRenderHTMLHeadingClampsLevel(t *testing.T) {
 	// Heading levels outside 1-6 should clamp to h2 to keep output valid HTML.
 	cases := []struct {

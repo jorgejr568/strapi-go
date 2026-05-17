@@ -21,7 +21,7 @@ func writeNode(sb *strings.Builder, n Node) {
 	switch v := n.(type) {
 	case *Paragraph:
 		sb.WriteString("<p>")
-		writeTexts(sb, v.Children)
+		writeInlines(sb, v.Children)
 		sb.WriteString("</p>")
 	case *Heading:
 		level := v.Level
@@ -32,7 +32,7 @@ func writeNode(sb *strings.Builder, n Node) {
 		sb.WriteString("<")
 		sb.WriteString(tag)
 		sb.WriteString(">")
-		writeTexts(sb, v.Children)
+		writeInlines(sb, v.Children)
 		sb.WriteString("</")
 		sb.WriteString(tag)
 		sb.WriteString(">")
@@ -54,11 +54,11 @@ func writeNode(sb *strings.Builder, n Node) {
 		sb.WriteString(">")
 	case *Quote:
 		sb.WriteString("<blockquote>")
-		writeTexts(sb, v.Children)
+		writeInlines(sb, v.Children)
 		sb.WriteString("</blockquote>")
 	case *Code:
 		sb.WriteString("<pre><code>")
-		writeTexts(sb, v.Children)
+		writeInlines(sb, v.Children)
 		sb.WriteString("</code></pre>")
 	case *Link:
 		sb.WriteString(`<a href="`)
@@ -88,6 +88,26 @@ func writeNode(sb *strings.Builder, n Node) {
 		sb.WriteString(" />")
 	case *Unknown:
 		// Skip unknown nodes silently.
+	}
+}
+
+// writeInlines renders a slice of inline nodes by dispatching on type.
+// Each *Text is rendered with its modifiers; each *InlineLink is rendered
+// as <a href="ESCAPED_URL">...</a> with its inner texts.
+func writeInlines(sb *strings.Builder, nodes []InlineNode) {
+	for _, n := range nodes {
+		switch v := n.(type) {
+		case *Text:
+			writeText(sb, *v)
+		case *InlineLink:
+			sb.WriteString(`<a href="`)
+			sb.WriteString(html.EscapeString(v.URL))
+			sb.WriteString(`">`)
+			for _, t := range v.Children {
+				writeText(sb, t)
+			}
+			sb.WriteString("</a>")
+		}
 	}
 }
 

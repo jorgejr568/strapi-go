@@ -42,7 +42,12 @@ func TestBlocksUnmarshal(t *testing.T) {
 	if len(p.Children) != 2 {
 		t.Errorf("paragraph children = %d", len(p.Children))
 	}
-	if !p.Children[1].Bold {
+	// Children are now InlineNode; assert via type assertion.
+	t1, ok := p.Children[1].(*Text)
+	if !ok {
+		t.Fatalf("p.Children[1] = %T want *Text", p.Children[1])
+	}
+	if !t1.Bold {
 		t.Errorf("second text should be bold")
 	}
 
@@ -214,5 +219,146 @@ func TestListUnmarshalReturnsErrorOnInvalidShape(t *testing.T) {
 	err := l.UnmarshalJSON([]byte(`{"format": 123}`)) // format must be string
 	if err == nil {
 		t.Fatal("expected error for invalid list format type")
+	}
+}
+
+func TestParagraphWithInlineLink(t *testing.T) {
+	raw := []byte(`{"type":"paragraph","children":[
+		{"type":"text","text":"see "},
+		{"type":"link","url":"https://example.com","children":[{"type":"text","text":"docs"}]},
+		{"type":"text","text":" please"}
+	]}`)
+	var p Paragraph
+	if err := json.Unmarshal(raw, &p); err != nil {
+		t.Fatal(err)
+	}
+	if len(p.Children) != 3 {
+		t.Fatalf("len = %d want 3", len(p.Children))
+	}
+	link, ok := p.Children[1].(*InlineLink)
+	if !ok {
+		t.Fatalf("Children[1] = %T want *InlineLink", p.Children[1])
+	}
+	if link.URL != "https://example.com" {
+		t.Errorf("URL = %q", link.URL)
+	}
+	if link.Children[0].Text != "docs" {
+		t.Errorf("link inner text = %q", link.Children[0].Text)
+	}
+}
+
+func TestHeadingWithInlineLink(t *testing.T) {
+	raw := []byte(`{"type":"heading","level":2,"children":[
+		{"type":"text","text":"about "},
+		{"type":"link","url":"/team","children":[{"type":"text","text":"us"}]}
+	]}`)
+	var h Heading
+	if err := json.Unmarshal(raw, &h); err != nil {
+		t.Fatal(err)
+	}
+	if h.Level != 2 || len(h.Children) != 2 {
+		t.Fatalf("unexpected: %+v", h)
+	}
+	if _, ok := h.Children[1].(*InlineLink); !ok {
+		t.Errorf("Children[1] = %T want *InlineLink", h.Children[1])
+	}
+}
+
+func TestInlineBearingBlocksHandleEmptyAndMissingChildren(t *testing.T) {
+	// Missing "children" key -> nil slice, no error.
+	var p Paragraph
+	if err := json.Unmarshal([]byte(`{"type":"paragraph"}`), &p); err != nil {
+		t.Fatal(err)
+	}
+	if p.Children != nil {
+		t.Errorf("paragraph children = %v want nil", p.Children)
+	}
+
+	var h Heading
+	if err := json.Unmarshal([]byte(`{"type":"heading","level":3}`), &h); err != nil {
+		t.Fatal(err)
+	}
+	if h.Level != 3 || h.Children != nil {
+		t.Errorf("heading = %+v", h)
+	}
+
+	var q Quote
+	if err := json.Unmarshal([]byte(`{"type":"quote"}`), &q); err != nil {
+		t.Fatal(err)
+	}
+	if q.Children != nil {
+		t.Errorf("quote children = %v want nil", q.Children)
+	}
+
+	var c Code
+	if err := json.Unmarshal([]byte(`{"type":"code"}`), &c); err != nil {
+		t.Fatal(err)
+	}
+	if c.Children != nil {
+		t.Errorf("code children = %v want nil", c.Children)
+	}
+}
+
+func TestInlineBearingBlocksReturnErrorOnInvalidShape(t *testing.T) {
+	// Top-level body must be a JSON object so the inner Unmarshal fails.
+	var p Paragraph
+	if err := p.UnmarshalJSON([]byte(`"not an object"`)); err == nil {
+		t.Error("paragraph: expected error on non-object body")
+	}
+	var h Heading
+	if err := h.UnmarshalJSON([]byte(`"not an object"`)); err == nil {
+		t.Error("heading: expected error on non-object body")
+	}
+	var q Quote
+	if err := q.UnmarshalJSON([]byte(`"not an object"`)); err == nil {
+		t.Error("quote: expected error on non-object body")
+	}
+	var c Code
+	if err := c.UnmarshalJSON([]byte(`"not an object"`)); err == nil {
+		t.Error("code: expected error on non-object body")
+	}
+}
+
+func TestInlineBearingBlocksPropagateDecodeInlineError(t *testing.T) {
+	// children is present but not a JSON array -> decodeInline returns an error.
+	bad := []byte(`{"type":"paragraph","children":{"oops":true}}`)
+	var p Paragraph
+	if err := p.UnmarshalJSON(bad); err == nil {
+		t.Error("paragraph: expected error when children is not an array")
+	}
+	badH := []byte(`{"type":"heading","level":1,"children":{"oops":true}}`)
+	var h Heading
+	if err := h.UnmarshalJSON(badH); err == nil {
+		t.Error("heading: expected error when children is not an array")
+	}
+	badQ := []byte(`{"type":"quote","children":{"oops":true}}`)
+	var q Quote
+	if err := q.UnmarshalJSON(badQ); err == nil {
+		t.Error("quote: expected error when children is not an array")
+	}
+	badC := []byte(`{"type":"code","children":{"oops":true}}`)
+	var c Code
+	if err := c.UnmarshalJSON(badC); err == nil {
+		t.Error("code: expected error when children is not an array")
+	}
+}
+
+func TestQuoteAndCodeUseInlineChildren(t *testing.T) {
+	q := []byte(`{"type":"quote","children":[{"type":"text","text":"q"}]}`)
+	var quote Quote
+	if err := json.Unmarshal(q, &quote); err != nil {
+		t.Fatal(err)
+	}
+	if len(quote.Children) != 1 {
+		t.Errorf("quote children = %d", len(quote.Children))
+	}
+
+	c := []byte(`{"type":"code","children":[{"type":"text","text":"x := 1"}]}`)
+	var code Code
+	if err := json.Unmarshal(c, &code); err != nil {
+		t.Fatal(err)
+	}
+	if len(code.Children) != 1 {
+		t.Errorf("code children = %d", len(code.Children))
 	}
 }

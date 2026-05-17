@@ -30,18 +30,60 @@ func (Text) nodeType() string { return "text" }
 
 // Paragraph is a paragraph of inline children.
 type Paragraph struct {
-	Children []Text `json:"children"`
+	Children []InlineNode `json:"-"`
 }
 
 func (Paragraph) nodeType() string { return "paragraph" }
 
+// UnmarshalJSON decodes the "children" array into []InlineNode via the
+// shared inline dispatcher.
+func (p *Paragraph) UnmarshalJSON(data []byte) error {
+	var aux struct {
+		Children json.RawMessage `json:"children"`
+	}
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+	if len(aux.Children) == 0 {
+		p.Children = nil
+		return nil
+	}
+	children, err := decodeInline(aux.Children)
+	if err != nil {
+		return err
+	}
+	p.Children = children
+	return nil
+}
+
 // Heading is a heading element. Level is 1–6.
 type Heading struct {
-	Level    int    `json:"level"`
-	Children []Text `json:"children"`
+	Level    int          `json:"level"`
+	Children []InlineNode `json:"-"`
 }
 
 func (Heading) nodeType() string { return "heading" }
+
+func (h *Heading) UnmarshalJSON(data []byte) error {
+	var aux struct {
+		Level    int             `json:"level"`
+		Children json.RawMessage `json:"children"`
+	}
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+	h.Level = aux.Level
+	if len(aux.Children) == 0 {
+		h.Children = nil
+		return nil
+	}
+	children, err := decodeInline(aux.Children)
+	if err != nil {
+		return err
+	}
+	h.Children = children
+	return nil
+}
 
 // ListItem is an element inside a List.
 type ListItem struct {
@@ -72,17 +114,55 @@ func (l *List) UnmarshalJSON(data []byte) error {
 
 // Quote is a block quotation.
 type Quote struct {
-	Children []Text `json:"children"`
+	Children []InlineNode `json:"-"`
 }
 
 func (Quote) nodeType() string { return "quote" }
 
+func (q *Quote) UnmarshalJSON(data []byte) error {
+	var aux struct {
+		Children json.RawMessage `json:"children"`
+	}
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+	if len(aux.Children) == 0 {
+		q.Children = nil
+		return nil
+	}
+	children, err := decodeInline(aux.Children)
+	if err != nil {
+		return err
+	}
+	q.Children = children
+	return nil
+}
+
 // Code is a code block.
 type Code struct {
-	Children []Text `json:"children"`
+	Children []InlineNode `json:"-"`
 }
 
 func (Code) nodeType() string { return "code" }
+
+func (c *Code) UnmarshalJSON(data []byte) error {
+	var aux struct {
+		Children json.RawMessage `json:"children"`
+	}
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+	if len(aux.Children) == 0 {
+		c.Children = nil
+		return nil
+	}
+	children, err := decodeInline(aux.Children)
+	if err != nil {
+		return err
+	}
+	c.Children = children
+	return nil
+}
 
 // Link is a block-level link. (Strapi emits links at the block level in
 // addition to the text-modifier form.)
