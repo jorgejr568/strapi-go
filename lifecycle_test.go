@@ -260,3 +260,42 @@ func TestCollectionLifecycle(t *testing.T) {
 		t.Errorf("Find after Delete: err = %v, want errors.Is(ErrNotFound)", err)
 	}
 }
+
+// TestSingleTypeLifecycle drives a SingleType through Get → Update → Get
+// against the same in-memory simulator. Verifies the update is persisted
+// and the second Get sees the new state.
+func TestSingleTypeLifecycle(t *testing.T) {
+	store := newMemoryStore()
+	srv := newTestServer(t, store.handler().ServeHTTP)
+
+	c := New(WithBaseURL(srv.URL))
+	hp := NewSingleType[homepageAttrs](c, "homepage")
+	ctx := context.Background()
+
+	// 1. Get initial state
+	initial, err := hp.Get(ctx)
+	if err != nil {
+		t.Fatalf("Get initial: %v", err)
+	}
+	if initial.Attributes.Headline != "default" {
+		t.Errorf("initial.Headline = %q", initial.Attributes.Headline)
+	}
+
+	// 2. Update with a partial map
+	updated, err := hp.Update(ctx, map[string]any{"headline": "Welcome back"})
+	if err != nil {
+		t.Fatalf("Update: %v", err)
+	}
+	if updated.Attributes.Headline != "Welcome back" {
+		t.Errorf("updated.Headline = %q", updated.Attributes.Headline)
+	}
+
+	// 3. Get again — the update should be persisted server-side
+	second, err := hp.Get(ctx)
+	if err != nil {
+		t.Fatalf("Get after Update: %v", err)
+	}
+	if second.Attributes.Headline != "Welcome back" {
+		t.Errorf("second.Headline = %q want 'Welcome back'", second.Attributes.Headline)
+	}
+}
