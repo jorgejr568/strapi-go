@@ -179,3 +179,75 @@ func TestDoErrorStatusBackfillWhenEnvelopeOmitsStatus(t *testing.T) {
 		t.Errorf("Name = %q", se.Name)
 	}
 }
+
+func TestDoReturnsMarshalErrorForUnmarshallableBody(t *testing.T) {
+	c := New(WithBaseURL("https://x"))
+	// A chan cannot be JSON-marshaled.
+	body := map[string]any{"data": make(chan int)}
+	err := c.do(context.Background(), http.MethodPost, "/api/pages", "", body, nil)
+	if err == nil {
+		t.Fatal("expected marshal error")
+	}
+	if !strings.Contains(err.Error(), "marshal body") {
+		t.Errorf("err = %v, want 'marshal body' in message", err)
+	}
+}
+
+func TestDoReturnsBuildRequestErrorForInvalidMethod(t *testing.T) {
+	c := New(WithBaseURL("https://x"))
+	// Method with a space is invalid per net/http.
+	err := c.do(context.Background(), "BAD METHOD", "/api/pages", "", nil, nil)
+	if err == nil {
+		t.Fatal("expected build-request error")
+	}
+	if !strings.Contains(err.Error(), "build request") {
+		t.Errorf("err = %v, want 'build request' in message", err)
+	}
+}
+
+func TestDoReturnsHTTPErrorWhenServerUnreachable(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	srv.Close() // close immediately so connection fails
+	c := New(WithBaseURL(srv.URL))
+	err := c.do(context.Background(), http.MethodGet, "/api/pages/abc", "", nil, nil)
+	if err == nil {
+		t.Fatal("expected http error")
+	}
+	if !strings.Contains(err.Error(), "http") {
+		t.Errorf("err = %v, want 'http' in message", err)
+	}
+}
+
+func TestDoReturnsErrBadResponseOnInvalidJSON(t *testing.T) {
+	srv := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte("not json at all"))
+	})
+
+	c := New(WithBaseURL(srv.URL))
+	var out single[pageAttrs]
+	err := c.do(context.Background(), http.MethodGet, "/api/pages/abc", "", nil, &out)
+	if err == nil {
+		t.Fatal("expected ErrBadResponse")
+	}
+	if !errors.Is(err, ErrBadResponse) {
+		t.Errorf("err = %v, want errors.Is(ErrBadResponse)", err)
+	}
+}
+
+func TestDoAppendsQueryWithAmpersandWhenPathHasQuestion(t *testing.T) {
+	// rawQuery appending uses & when the URL already contains ?.
+	// Build a path containing a literal ? so do() takes the & branch.
+	var gotURL string
+	srv := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		gotURL = r.URL.String()
+		_, _ = w.Write([]byte(`{}`))
+	})
+	c := New(WithBaseURL(srv.URL))
+	err := c.do(context.Background(), http.MethodGet, "/api/pages?preset=foo", "locale=en", nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(gotURL, "preset=foo&locale=en") {
+		t.Errorf("URL = %q want '?preset=foo&locale=en'", gotURL)
+	}
+}
