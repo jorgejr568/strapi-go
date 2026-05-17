@@ -1,0 +1,44 @@
+{
+  "data": {
+    "id": 1,
+    "attributes": {
+      "title": "Post With Relations",
+      "slug": "post",
+      "createdAt": "2026-01-02T03:04:05.000Z",
+      "updatedAt": "2026-01-03T03:04:05.000Z",
+      "publishedAt": "2026-01-02T03:04:05.000Z",
+      "locale": "en",
+      "author": {
+        "data": {
+          "id": 5,
+          "attributes": {
+            "name": "Alice",
+            "avatar": {
+              "data": {
+                "id": 9,
+                "attributes": {
+                  "name": "alice.png",
+                  "hash": "alice_hash",
+                  "ext": ".png",
+                  "mime": "image/png",
+                  "size": 1234.5,
+                  "url": "/uploads/alice.png",
+                  "provider": "local",
+                  "createdAt": "2026-01-01T00:00:00.000Z",
+                  "updatedAt": "2026-01-01T00:00:00.000Z"
+                }
+              }
+            }
+          }
+        }
+      },
+      "tags": {
+        "data": [
+          { "id": 7, "attributes": { "name": "go" } },
+          { "id": 8, "attributes": { "name": "rest" } }
+        ]
+      }
+    }
+  },
+  "meta": {}
+}
