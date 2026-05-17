@@ -251,3 +251,35 @@ func TestDoAppendsQueryWithAmpersandWhenPathHasQuestion(t *testing.T) {
 		t.Errorf("URL = %q want '?preset=foo&locale=en'", gotURL)
 	}
 }
+
+func TestDoV4ResponseIsNormalizedBeforeUnmarshal(t *testing.T) {
+	srv := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		// Strapi v4 single-entry shape.
+		_, _ = w.Write([]byte(`{
+			"data": {
+				"id": 7,
+				"attributes": {
+					"title": "From v4",
+					"slug":  "from-v4"
+				}
+			},
+			"meta": {}
+		}`))
+	})
+
+	c := New(WithBaseURL(srv.URL), WithAPIVersion(APIVersionV4))
+	var out single[pageAttrs]
+	if err := c.do(context.Background(), http.MethodGet, "/api/pages/7", "", nil, &out); err != nil {
+		t.Fatalf("do: %v", err)
+	}
+	if out.Data.ID != 7 {
+		t.Errorf("ID = %d want 7", out.Data.ID)
+	}
+	if out.Data.Attributes.Title != "From v4" {
+		t.Errorf("Title = %q want \"From v4\"", out.Data.Attributes.Title)
+	}
+	if out.Data.Attributes.Slug != "from-v4" {
+		t.Errorf("Slug = %q", out.Data.Attributes.Slug)
+	}
+}

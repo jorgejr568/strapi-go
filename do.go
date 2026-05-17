@@ -72,6 +72,13 @@ func (c *Client) do(ctx context.Context, method, path, rawQuery string, body, ds
 	if dst == nil || len(respBody) == 0 {
 		return nil
 	}
+	if c.apiVersion == APIVersionV4 {
+		normalized, err := normalizeV4ToV5(respBody)
+		if err != nil {
+			return fmt.Errorf("%w: v4 normalize: %v", ErrBadResponse, err)
+		}
+		respBody = normalized
+	}
 	if err := json.Unmarshal(respBody, dst); err != nil {
 		return fmt.Errorf("%w: %v", ErrBadResponse, err)
 	}
