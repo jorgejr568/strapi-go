@@ -44,8 +44,13 @@ func (d *Document[T]) UnmarshalJSON(data []byte) error {
 	return json.Unmarshal(data, &d.Attributes)
 }
 
-// List is the envelope for collection-list responses.
-type List[T any] struct {
+// ListResponse is the envelope for collection-list responses. It is the
+// return type of Collection[T].List and the top-level List[T] helper.
+//
+// (Named ListResponse rather than List because Go places types and
+// functions in the same package-scope namespace and the public API also
+// exposes a generic helper named List.)
+type ListResponse[T any] struct {
 	Data []Document[T] `json:"data"`
 	Meta Meta          `json:"meta"`
 }

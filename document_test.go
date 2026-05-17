@@ -57,7 +57,7 @@ func TestDocumentUnmarshalSingle(t *testing.T) {
 
 func TestDocumentUnmarshalListWithNullPublishedAt(t *testing.T) {
 	raw := readFixture(t, "page_list.json")
-	var env List[pageAttrs]
+	var env ListResponse[pageAttrs]
 	if err := json.Unmarshal(raw, &env); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
