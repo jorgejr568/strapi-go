@@ -74,3 +74,22 @@ func TestFilterNestedRelation(t *testing.T) {
 		t.Fatalf("got %q want %q", got, want)
 	}
 }
+
+func TestFilterNotNilDoesNotPanic(t *testing.T) {
+	// Defensive: Not(nil) should not panic and should emit no filter.
+	q := New(Where(Not(nil)))
+	got := q.Build()
+	if got != "" {
+		t.Errorf("Not(nil) should emit nothing, got %q", got)
+	}
+}
+
+func TestFilterAndOrSkipNils(t *testing.T) {
+	q := New(Where(And(Eq("a", 1), nil, Eq("b", 2))))
+	got := q.Build()
+	// First child at index 0 = a=1, third at index 2 = b=2 (nil index 1 skipped)
+	want := "filters%5B%24and%5D%5B0%5D%5Ba%5D%5B%24eq%5D=1&filters%5B%24and%5D%5B2%5D%5Bb%5D%5B%24eq%5D=2"
+	if got != want {
+		t.Errorf("got %q want %q", got, want)
+	}
+}

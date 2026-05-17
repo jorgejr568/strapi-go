@@ -3,6 +3,7 @@ package strapi
 import (
 	"context"
 	"net/http"
+	"net/url"
 
 	"github.com/jorgejr568/strapi-go/query"
 )
@@ -25,7 +26,7 @@ func NewCollection[T any](c *Client, endpoint string) *Collection[T] {
 func (col *Collection[T]) Find(ctx context.Context, documentID string, opts ...query.Option) (*Document[T], error) {
 	q := query.New(opts...).Build()
 	var env single[T]
-	if err := col.client.do(ctx, http.MethodGet, "/api/"+col.endpoint+"/"+documentID, q, nil, &env); err != nil {
+	if err := col.client.do(ctx, http.MethodGet, "/api/"+url.PathEscape(col.endpoint)+"/"+url.PathEscape(documentID), q, nil, &env); err != nil {
 		return nil, err
 	}
 	return &env.Data, nil
@@ -36,7 +37,7 @@ func (col *Collection[T]) Find(ctx context.Context, documentID string, opts ...q
 func (col *Collection[T]) List(ctx context.Context, opts ...query.Option) (*ListResponse[T], error) {
 	q := query.New(opts...).Build()
 	var env ListResponse[T]
-	if err := col.client.do(ctx, http.MethodGet, "/api/"+col.endpoint, q, nil, &env); err != nil {
+	if err := col.client.do(ctx, http.MethodGet, "/api/"+url.PathEscape(col.endpoint), q, nil, &env); err != nil {
 		return nil, err
 	}
 	return &env, nil
@@ -62,7 +63,7 @@ func (col *Collection[T]) Create(ctx context.Context, attrs T, opts ...query.Opt
 	q := query.New(opts...).Build()
 	var env single[T]
 	body := map[string]any{"data": attrs}
-	if err := col.client.do(ctx, http.MethodPost, "/api/"+col.endpoint, q, body, &env); err != nil {
+	if err := col.client.do(ctx, http.MethodPost, "/api/"+url.PathEscape(col.endpoint), q, body, &env); err != nil {
 		return nil, err
 	}
 	return &env.Data, nil
@@ -76,7 +77,7 @@ func (col *Collection[T]) Update(ctx context.Context, documentID string, attrs a
 	q := query.New(opts...).Build()
 	var env single[T]
 	body := map[string]any{"data": attrs}
-	if err := col.client.do(ctx, http.MethodPut, "/api/"+col.endpoint+"/"+documentID, q, body, &env); err != nil {
+	if err := col.client.do(ctx, http.MethodPut, "/api/"+url.PathEscape(col.endpoint)+"/"+url.PathEscape(documentID), q, body, &env); err != nil {
 		return nil, err
 	}
 	return &env.Data, nil
@@ -85,7 +86,7 @@ func (col *Collection[T]) Update(ctx context.Context, documentID string, attrs a
 // Delete removes an entry by documentId. The Strapi response body, if any,
 // is discarded.
 func (col *Collection[T]) Delete(ctx context.Context, documentID string) error {
-	return col.client.do(ctx, http.MethodDelete, "/api/"+col.endpoint+"/"+documentID, "", nil, nil)
+	return col.client.do(ctx, http.MethodDelete, "/api/"+url.PathEscape(col.endpoint)+"/"+url.PathEscape(documentID), "", nil, nil)
 }
 
 // Create is a top-level convenience wrapper.

@@ -3,6 +3,7 @@ package strapi
 import (
 	"context"
 	"net/http"
+	"net/url"
 
 	"github.com/jorgejr568/strapi-go/query"
 )
@@ -26,7 +27,7 @@ func NewSingleType[T any](c *Client, endpoint string) *SingleType[T] {
 func (s *SingleType[T]) Get(ctx context.Context, opts ...query.Option) (*Document[T], error) {
 	q := query.New(opts...).Build()
 	var env single[T]
-	if err := s.client.do(ctx, http.MethodGet, "/api/"+s.endpoint, q, nil, &env); err != nil {
+	if err := s.client.do(ctx, http.MethodGet, "/api/"+url.PathEscape(s.endpoint), q, nil, &env); err != nil {
 		return nil, err
 	}
 	return &env.Data, nil
@@ -38,7 +39,7 @@ func (s *SingleType[T]) Update(ctx context.Context, attrs any, opts ...query.Opt
 	q := query.New(opts...).Build()
 	var env single[T]
 	body := map[string]any{"data": attrs}
-	if err := s.client.do(ctx, http.MethodPut, "/api/"+s.endpoint, q, body, &env); err != nil {
+	if err := s.client.do(ctx, http.MethodPut, "/api/"+url.PathEscape(s.endpoint), q, body, &env); err != nil {
 		return nil, err
 	}
 	return &env.Data, nil
@@ -48,7 +49,7 @@ func (s *SingleType[T]) Update(ctx context.Context, attrs any, opts ...query.Opt
 // some treat this as deleting the content row; others as resetting to
 // empty. Either way, the response body is discarded.
 func (s *SingleType[T]) Delete(ctx context.Context) error {
-	return s.client.do(ctx, http.MethodDelete, "/api/"+s.endpoint, "", nil, nil)
+	return s.client.do(ctx, http.MethodDelete, "/api/"+url.PathEscape(s.endpoint), "", nil, nil)
 }
 
 // GetSingle is a top-level convenience wrapper.

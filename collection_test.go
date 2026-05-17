@@ -90,6 +90,26 @@ func TestCollectionList(t *testing.T) {
 	}
 }
 
+func TestCollectionFindEscapesDocumentID(t *testing.T) {
+	var gotEscapedPath string
+	srv := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		gotEscapedPath = r.URL.EscapedPath()
+		b, _ := os.ReadFile(filepath.Join("testdata", "page_single.json"))
+		_, _ = w.Write(b)
+	})
+
+	c := New(WithBaseURL(srv.URL))
+	pages := NewCollection[pageAttrs](c, "pages")
+	_, err := pages.Find(context.Background(), "weird id/with space")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "/api/pages/weird%20id%2Fwith%20space"
+	if gotEscapedPath != want {
+		t.Errorf("escaped path = %q want %q", gotEscapedPath, want)
+	}
+}
+
 func TestTopLevelFindList(t *testing.T) {
 	srv := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
 		var path string

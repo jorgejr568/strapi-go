@@ -71,12 +71,16 @@ func Between(field string, lo, hi any) Filter {
 	return arrayFilter{field: field, op: "$between", vals: []any{lo, hi}}
 }
 
-// In matches values in the given set.
+// In matches values in the given set. Note: passing no vals produces no
+// filter clause at all (Strapi returns all rows) — guard at the call site
+// if you need an empty set to match nothing.
 func In(field string, vals ...any) Filter {
 	return arrayFilter{field: field, op: "$in", vals: vals}
 }
 
-// NotIn matches values NOT in the given set.
+// NotIn matches values NOT in the given set. Note: passing no vals produces
+// no filter clause; if you need an empty exclusion to match all, omit the
+// filter entirely.
 func NotIn(field string, vals ...any) Filter {
 	return arrayFilter{field: field, op: "$notIn", vals: vals}
 }
@@ -103,13 +107,17 @@ type logical struct {
 
 func (l logical) encode(q *Query, prefix []string) {
 	if l.op == "$not" {
-		full := append(append([]string{}, prefix...), "$not")
-		if len(l.children) == 1 {
-			l.children[0].encode(q, full)
+		if len(l.children) != 1 || l.children[0] == nil {
+			return
 		}
+		full := append(append([]string{}, prefix...), "$not")
+		l.children[0].encode(q, full)
 		return
 	}
 	for i, ch := range l.children {
+		if ch == nil {
+			continue
+		}
 		full := append(append([]string{}, prefix...), l.op, strconv.Itoa(i))
 		ch.encode(q, full)
 	}
