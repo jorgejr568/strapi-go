@@ -49,3 +49,10 @@ func TestNewClientPanicsWithoutBaseURL(t *testing.T) {
 	}()
 	_ = New()
 }
+
+func TestNewClientWithUserAgent(t *testing.T) {
+	c := New(WithBaseURL("https://x"), WithUserAgent("my-app/1.0"))
+	if c.userAgent != "my-app/1.0" {
+		t.Errorf("userAgent = %q want %q", c.userAgent, "my-app/1.0")
+	}
+}

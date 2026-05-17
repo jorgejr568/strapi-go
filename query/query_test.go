@@ -75,3 +75,19 @@ func TestQueryCombined(t *testing.T) {
 		t.Fatalf("got %q\nwant %q", got, want)
 	}
 }
+
+func TestQueryWithCount(t *testing.T) {
+	q := New(Paginate(1, 25), WithCount(true))
+	got := q.Build()
+	want := "pagination%5Bpage%5D=1&pagination%5BpageSize%5D=25&pagination%5BwithCount%5D=true"
+	if got != want {
+		t.Fatalf("got %q\nwant %q", got, want)
+	}
+}
+
+func TestQueryWithCountFalse(t *testing.T) {
+	q := New(WithCount(false))
+	if got := q.Build(); got != "pagination%5BwithCount%5D=false" {
+		t.Fatalf("got %q", got)
+	}
+}
