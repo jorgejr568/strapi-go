@@ -21,7 +21,6 @@ Not yet:
 
 - File uploads
 - Dynamic-zone typed registry
-- v4 response-format compatibility
 - Markdown renderer for blocks
 - Inline links and nested lists inside rich-text bodies are decoded as
   plain text only — the `Children` fields on inline-bearing block types
@@ -40,6 +39,29 @@ go get github.com/jorgejr568/strapi-go
 ```
 
 Requires Go 1.22+.
+
+## Strapi version
+
+The SDK defaults to Strapi v5. To use it against a v4 instance, opt in:
+
+```go
+c := strapi.New(
+    strapi.WithBaseURL("https://cms.example.com"),
+    strapi.WithToken("…"),
+    strapi.WithAPIVersion(strapi.APIVersionV4),
+)
+```
+
+Same typed accessors, same query builder. The SDK transparently rewrites
+v4 response envelopes (`{id, attributes: {…}}` entries and `{data: …}`
+relation wrappers) into the v5 flat shape the typed accessors expect. Two
+things to know:
+
+- v4 entries have no `documentId`. Use `doc.PathID()` to chain operations
+  in a version-agnostic way — it returns `DocumentID` (v5) or
+  `strconv.Itoa(ID)` (v4).
+- v5's `Status(StatusDraft)` maps to v4's `publicationState=preview`,
+  which returns drafts AND published. v4 has no "drafts only" mode.
 
 ## Quick start — read
 
