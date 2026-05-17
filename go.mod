@@ -1,3 +1,3 @@
-module strapi-go
+module github.com/jorgejr568/strapi-go
 
-go 1.19
+go 1.22
