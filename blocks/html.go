@@ -46,7 +46,7 @@ func writeNode(sb *strings.Builder, n Node) {
 		sb.WriteString(">")
 		for _, item := range v.Items {
 			sb.WriteString("<li>")
-			writeTexts(sb, item.Children)
+			writeListItemChildren(sb, item.Children)
 			sb.WriteString("</li>")
 		}
 		sb.WriteString("</")
@@ -111,9 +111,25 @@ func writeInlines(sb *strings.Builder, nodes []InlineNode) {
 	}
 }
 
-func writeTexts(sb *strings.Builder, texts []Text) {
-	for _, t := range texts {
-		writeText(sb, t)
+// writeListItemChildren renders the children of a list-item, dispatching on
+// the union type ListItemChild: *Text and *InlineLink render inline,
+// *List renders as a nested <ul> or <ol>.
+func writeListItemChildren(sb *strings.Builder, children []ListItemChild) {
+	for _, c := range children {
+		switch v := c.(type) {
+		case *Text:
+			writeText(sb, *v)
+		case *InlineLink:
+			sb.WriteString(`<a href="`)
+			sb.WriteString(html.EscapeString(v.URL))
+			sb.WriteString(`">`)
+			for _, t := range v.Children {
+				writeText(sb, t)
+			}
+			sb.WriteString("</a>")
+		case *List:
+			writeNode(sb, v) // recurse — emits a full <ul>/<ol> block
+		}
 	}
 }
 

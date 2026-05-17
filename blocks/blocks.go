@@ -85,9 +85,65 @@ func (h *Heading) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// ListItem is an element inside a List.
+// ListItemChild is anything that can appear inside a list-item's children:
+// inline content (*Text, *InlineLink) and nested block-level lists (*List).
+// The interface is sealed to types in this package.
+type ListItemChild interface {
+	isListItemChild()
+}
+
+func (Text) isListItemChild()       {}
+func (InlineLink) isListItemChild() {}
+func (List) isListItemChild()       {}
+
+// ListItem is an element inside a List. Its Children can mix inline runs,
+// inline links, and nested lists (Strapi emits all three patterns).
 type ListItem struct {
-	Children []Text `json:"children"`
+	Children []ListItemChild `json:"-"`
+}
+
+// UnmarshalJSON decodes the "children" array by dispatching each item by
+// its "type" discriminator into the appropriate concrete type.
+func (li *ListItem) UnmarshalJSON(data []byte) error {
+	var aux struct {
+		Children []json.RawMessage `json:"children"`
+	}
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+	out := make([]ListItemChild, 0, len(aux.Children))
+	for _, raw := range aux.Children {
+		var head struct {
+			Type string `json:"type"`
+		}
+		if err := json.Unmarshal(raw, &head); err != nil {
+			return err
+		}
+		switch head.Type {
+		case "text":
+			var n Text
+			if err := json.Unmarshal(raw, &n); err != nil {
+				return err
+			}
+			out = append(out, &n)
+		case "link":
+			var n InlineLink
+			if err := json.Unmarshal(raw, &n); err != nil {
+				return err
+			}
+			out = append(out, &n)
+		case "list":
+			var n List
+			if err := json.Unmarshal(raw, &n); err != nil {
+				return err
+			}
+			out = append(out, &n)
+		default:
+			// Drop unknowns silently.
+		}
+	}
+	li.Children = out
+	return nil
 }
 
 // List is an ordered or unordered list.

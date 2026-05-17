@@ -119,6 +119,40 @@ func TestRenderHTMLParagraphWithInlineLink(t *testing.T) {
 	}
 }
 
+func TestRenderHTMLListItemWithInlineLink(t *testing.T) {
+	// Exercises writeListItemChildren's *InlineLink branch, including URL
+	// escaping and inner text rendering.
+	got := renderFixture(t, `[{"type":"list","format":"unordered","children":[
+		{"type":"list-item","children":[
+			{"type":"text","text":"see "},
+			{"type":"link","url":"https://example.com/?q=1&x=2","children":[{"type":"text","text":"docs","bold":true}]}
+		]}
+	]}]`)
+	want := `<ul><li>see <a href="https://example.com/?q=1&amp;x=2"><strong>docs</strong></a></li></ul>`
+	if got != want {
+		t.Errorf("got %q want %q", got, want)
+	}
+}
+
+func TestRenderHTMLListItemWithNestedList(t *testing.T) {
+	// Exercises writeListItemChildren's *List branch — nested lists recurse
+	// through writeNode and emit a full <ul>/<ol> block inside the <li>.
+	got := renderFixture(t, `[{"type":"list","format":"unordered","children":[
+		{"type":"list-item","children":[
+			{"type":"text","text":"outer "},
+			{"type":"list","format":"ordered","children":[
+				{"type":"list-item","children":[{"type":"text","text":"inner1"}]},
+				{"type":"list-item","children":[{"type":"text","text":"inner2"}]}
+			]}
+		]},
+		{"type":"list-item","children":[{"type":"text","text":"second"}]}
+	]}]`)
+	want := "<ul><li>outer <ol><li>inner1</li><li>inner2</li></ol></li><li>second</li></ul>"
+	if got != want {
+		t.Errorf("got %q want %q", got, want)
+	}
+}
+
 func TestRenderHTMLHeadingClampsLevel(t *testing.T) {
 	// Heading levels outside 1-6 should clamp to h2 to keep output valid HTML.
 	cases := []struct {

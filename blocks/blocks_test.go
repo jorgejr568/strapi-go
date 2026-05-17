@@ -441,3 +441,130 @@ func TestLinkAndImageHandleMissingChildren(t *testing.T) {
 		t.Errorf("image = %+v", img)
 	}
 }
+
+func TestListItemSupportsNestedList(t *testing.T) {
+	raw := []byte(`{"type":"list","format":"unordered","children":[
+		{"type":"list-item","children":[
+			{"type":"text","text":"outer "},
+			{"type":"list","format":"unordered","children":[
+				{"type":"list-item","children":[{"type":"text","text":"inner1"}]},
+				{"type":"list-item","children":[{"type":"text","text":"inner2"}]}
+			]}
+		]},
+		{"type":"list-item","children":[{"type":"text","text":"second top"}]}
+	]}`)
+	var outer List
+	if err := json.Unmarshal(raw, &outer); err != nil {
+		t.Fatal(err)
+	}
+	if len(outer.Items) != 2 {
+		t.Fatalf("outer items = %d", len(outer.Items))
+	}
+	if len(outer.Items[0].Children) != 2 {
+		t.Fatalf("first item children = %d want 2 (text + nested list)", len(outer.Items[0].Children))
+	}
+	if _, ok := outer.Items[0].Children[0].(*Text); !ok {
+		t.Errorf("Items[0].Children[0] = %T want *Text", outer.Items[0].Children[0])
+	}
+	nested, ok := outer.Items[0].Children[1].(*List)
+	if !ok {
+		t.Fatalf("Items[0].Children[1] = %T want *List", outer.Items[0].Children[1])
+	}
+	if len(nested.Items) != 2 {
+		t.Errorf("nested items = %d", len(nested.Items))
+	}
+	if _, ok := nested.Items[0].Children[0].(*Text); !ok {
+		t.Errorf("nested Items[0].Children[0] should be *Text")
+	}
+}
+
+func TestListItemSupportsInlineLinkInChildren(t *testing.T) {
+	raw := []byte(`{"type":"list-item","children":[
+		{"type":"text","text":"see "},
+		{"type":"link","url":"https://x","children":[{"type":"text","text":"link"}]}
+	]}`)
+	var item ListItem
+	if err := json.Unmarshal(raw, &item); err != nil {
+		t.Fatal(err)
+	}
+	if len(item.Children) != 2 {
+		t.Fatalf("len = %d", len(item.Children))
+	}
+	if _, ok := item.Children[1].(*InlineLink); !ok {
+		t.Errorf("Children[1] = %T want *InlineLink", item.Children[1])
+	}
+}
+
+func TestListItemHandlesInvalidShapeAndErrors(t *testing.T) {
+	// invalid outer JSON
+	var item ListItem
+	if err := item.UnmarshalJSON([]byte(`"not an object"`)); err == nil {
+		t.Error("expected error for invalid shape")
+	}
+	// invalid inner element (number where object expected)
+	var item2 ListItem
+	if err := item2.UnmarshalJSON([]byte(`{"type":"list-item","children":[123]}`)); err == nil {
+		t.Error("expected error for non-object child")
+	}
+	// invalid text body
+	var item3 ListItem
+	if err := item3.UnmarshalJSON([]byte(`{"type":"list-item","children":[{"type":"text","text":123}]}`)); err == nil {
+		t.Error("expected error for malformed text body")
+	}
+	// invalid link body
+	var item4 ListItem
+	if err := item4.UnmarshalJSON([]byte(`{"type":"list-item","children":[{"type":"link","url":123}]}`)); err == nil {
+		t.Error("expected error for malformed link body")
+	}
+	// invalid nested list body
+	var item5 ListItem
+	if err := item5.UnmarshalJSON([]byte(`{"type":"list-item","children":[{"type":"list","format":123}]}`)); err == nil {
+		t.Error("expected error for malformed nested list body")
+	}
+}
+
+func TestListItemDropsUnknownInlineTypes(t *testing.T) {
+	// Unknown types inside list-item children should be silently dropped
+	// (mirrors decodeInline behavior).
+	raw := []byte(`{"type":"list-item","children":[
+		{"type":"text","text":"keep"},
+		{"type":"future","payload":"drop"},
+		{"type":"text","text":" me"}
+	]}`)
+	var item ListItem
+	if err := json.Unmarshal(raw, &item); err != nil {
+		t.Fatal(err)
+	}
+	if len(item.Children) != 2 {
+		t.Errorf("len = %d want 2 (unknown dropped)", len(item.Children))
+	}
+}
+
+func TestListItemChildInterfaceConformance(t *testing.T) {
+	// Compile-time and runtime assertion that Text, InlineLink, and List
+	// all implement ListItemChild. Calls the sealing stubs to lock in the
+	// method set and exercise the unexported isListItemChild bodies.
+	var _ ListItemChild = Text{}
+	var _ ListItemChild = InlineLink{}
+	var _ ListItemChild = List{}
+	(Text{}).isListItemChild()
+	(InlineLink{}).isListItemChild()
+	(List{}).isListItemChild()
+}
+
+func TestListItemAlsoCoverableInExistingFixture(t *testing.T) {
+	// Sanity check: the existing TestBlocksUnmarshal sample fixture (which
+	// has plain list-items with just text children) should still produce
+	// *Text values in ListItem.Children after the refactor.
+	raw := []byte(`{"type":"list-item","children":[{"type":"text","text":"hello"}]}`)
+	var item ListItem
+	if err := json.Unmarshal(raw, &item); err != nil {
+		t.Fatal(err)
+	}
+	if len(item.Children) != 1 {
+		t.Fatalf("len = %d", len(item.Children))
+	}
+	if t0, ok := item.Children[0].(*Text); !ok || t0.Text != "hello" {
+		t.Errorf("Children[0] = %T %q want *Text 'hello'", item.Children[0], item.Children[0])
+	}
+}
