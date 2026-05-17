@@ -75,3 +75,30 @@ func TestResolveURLEmptyURL(t *testing.T) {
 		t.Errorf("empty url should remain empty, got %q", got)
 	}
 }
+
+func TestResolveURLDataURIPassthrough(t *testing.T) {
+	// data: URIs should pass through unchanged like absolute URLs.
+	got := ResolveURL("https://cms.example.com", "data:image/png;base64,iVBORw0KGgo=")
+	want := "data:image/png;base64,iVBORw0KGgo="
+	if got != want {
+		t.Errorf("got %q want %q", got, want)
+	}
+}
+
+func TestResolveURLAddsLeadingSlash(t *testing.T) {
+	// Relative URLs without a leading slash should get one prepended.
+	got := ResolveURL("https://cms.example.com", "uploads/x.jpg")
+	want := "https://cms.example.com/uploads/x.jpg"
+	if got != want {
+		t.Errorf("got %q want %q", got, want)
+	}
+}
+
+func TestResolveURLBaseWithPathPrefix(t *testing.T) {
+	// Base URL with a path prefix (common reverse-proxy deployment) preserves it.
+	got := ResolveURL("https://example.com/strapi", "/uploads/x.jpg")
+	want := "https://example.com/strapi/uploads/x.jpg"
+	if got != want {
+		t.Errorf("got %q want %q", got, want)
+	}
+}
