@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"sync"
 	"testing"
@@ -297,5 +298,83 @@ func TestSingleTypeLifecycle(t *testing.T) {
 	}
 	if second.Attributes.Headline != "Welcome back" {
 		t.Errorf("second.Headline = %q want 'Welcome back'", second.Attributes.Headline)
+	}
+}
+
+// TestComplexQueryRoundtrip builds a maximally-rich query and verifies
+// every query parameter makes it onto the wire and the response decodes.
+func TestComplexQueryRoundtrip(t *testing.T) {
+	var gotQuery string
+	srv := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		gotQuery = r.URL.RawQuery
+		_, _ = w.Write([]byte(`{
+            "data": [
+                {"id": 1, "documentId": "d1", "title": "A", "slug": "a",
+                 "createdAt": "2026-01-01T00:00:00Z", "updatedAt": "2026-01-01T00:00:00Z"}
+            ],
+            "meta": {"pagination": {"page": 2, "pageSize": 5, "pageCount": 3, "total": 12}}
+        }`))
+	})
+
+	c := New(WithBaseURL(srv.URL))
+	pages := NewCollection[pageAttrs](c, "pages")
+
+	list, err := pages.List(context.Background(),
+		query.Paginate(2, 5),
+		query.Sort("title:asc", "createdAt:desc"),
+		query.Locale("en"),
+		query.Status(query.StatusPublished),
+		query.Where(query.And(
+			query.Eq("status", "active"),
+			query.Or(
+				query.Eq("featured", true),
+				query.Gt("views", 1000),
+			),
+		)),
+		query.With(
+			query.Field("author").Fields("name", "email"),
+			query.Field("categories").
+				Sort("name:asc").
+				Populate(query.Field("parent").Fields("name")),
+		),
+	)
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+
+	// Verify response decoded.
+	if len(list.Data) != 1 || list.Meta.Pagination.Page != 2 || list.Meta.Pagination.Total != 12 {
+		t.Fatalf("response decode unexpected: %+v", list)
+	}
+
+	// Verify every query layer made it onto the wire.
+	// net/url.ParseQuery decodes percent-encoded bracket keys back to their
+	// literal Go form, so we can assert on "populate[0]" etc. directly.
+	parsed, err := url.ParseQuery(gotQuery)
+	if err != nil {
+		t.Fatalf("parse query: %v\nraw: %s", err, gotQuery)
+	}
+	mustHave := []struct {
+		key   string
+		value string
+	}{
+		{"pagination[page]", "2"},
+		{"pagination[pageSize]", "5"},
+		{"sort[0]", "title:asc"},
+		{"sort[1]", "createdAt:desc"},
+		{"locale", "en"},
+		{"status", "published"},
+		{"filters[$and][0][status][$eq]", "active"},
+		{"filters[$and][1][$or][0][featured][$eq]", "true"},
+		{"filters[$and][1][$or][1][views][$gt]", "1000"},
+		{"populate[author][fields][0]", "name"},
+		{"populate[author][fields][1]", "email"},
+		{"populate[categories][sort][0]", "name:asc"},
+		{"populate[categories][populate][parent][fields][0]", "name"},
+	}
+	for _, mh := range mustHave {
+		if got := parsed.Get(mh.key); got != mh.value {
+			t.Errorf("missing query param %q=%q (got %q)", mh.key, mh.value, got)
+		}
 	}
 }
