@@ -13,6 +13,7 @@ type Client struct {
 	baseURL    string
 	token      string
 	userAgent  string
+	apiVersion APIVersion
 	httpClient *http.Client
 }
 

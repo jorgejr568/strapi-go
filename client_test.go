@@ -56,3 +56,17 @@ func TestNewClientWithUserAgent(t *testing.T) {
 		t.Errorf("userAgent = %q want %q", c.userAgent, "my-app/1.0")
 	}
 }
+
+func TestNewClientDefaultsToV5(t *testing.T) {
+	c := New(WithBaseURL("https://x"))
+	if c.apiVersion != APIVersionV5 {
+		t.Errorf("apiVersion = %v want APIVersionV5", c.apiVersion)
+	}
+}
+
+func TestNewClientWithAPIVersionV4(t *testing.T) {
+	c := New(WithBaseURL("https://x"), WithAPIVersion(APIVersionV4))
+	if c.apiVersion != APIVersionV4 {
+		t.Errorf("apiVersion = %v want APIVersionV4", c.apiVersion)
+	}
+}
