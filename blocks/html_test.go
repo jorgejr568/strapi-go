@@ -153,6 +153,28 @@ func TestRenderHTMLListItemWithNestedList(t *testing.T) {
 	}
 }
 
+func TestRenderHTMLInlineLinkEscapesURL(t *testing.T) {
+	// URLs containing characters meaningful to HTML (e.g. & in a query
+	// string) must be escaped in the href attribute.
+	got := renderFixture(t, `[{"type":"paragraph","children":[
+		{"type":"link","url":"https://x.com/path?a=1&b=2","children":[{"type":"text","text":"go"}]}
+	]}]`)
+	if !strings.Contains(got, `href="https://x.com/path?a=1&amp;b=2"`) {
+		t.Errorf("URL ampersand should be escaped, got %q", got)
+	}
+}
+
+func TestRenderHTMLHeadingWithInlineLink(t *testing.T) {
+	got := renderFixture(t, `[{"type":"heading","level":2,"children":[
+		{"type":"text","text":"About "},
+		{"type":"link","url":"/team","children":[{"type":"text","text":"us"}]}
+	]}]`)
+	want := `<h2>About <a href="/team">us</a></h2>`
+	if got != want {
+		t.Errorf("got %q\nwant %q", got, want)
+	}
+}
+
 func TestRenderHTMLHeadingClampsLevel(t *testing.T) {
 	// Heading levels outside 1-6 should clamp to h2 to keep output valid HTML.
 	cases := []struct {
