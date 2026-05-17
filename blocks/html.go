@@ -64,7 +64,7 @@ func writeNode(sb *strings.Builder, n Node) {
 		sb.WriteString(`<a href="`)
 		sb.WriteString(html.EscapeString(v.URL))
 		sb.WriteString(`">`)
-		writeTexts(sb, v.Children)
+		writeInlines(sb, v.Children)
 		sb.WriteString("</a>")
 	case *Image:
 		sb.WriteString(`<img src="`)

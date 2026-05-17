@@ -362,3 +362,82 @@ func TestQuoteAndCodeUseInlineChildren(t *testing.T) {
 		t.Errorf("code children = %d", len(code.Children))
 	}
 }
+
+func TestBlockLevelLinkChildrenAreInline(t *testing.T) {
+	raw := []byte(`{"type":"link","url":"https://x","children":[
+		{"type":"text","text":"go ","bold":true},
+		{"type":"text","text":"home"}
+	]}`)
+	var l Link
+	if err := json.Unmarshal(raw, &l); err != nil {
+		t.Fatal(err)
+	}
+	if l.URL != "https://x" || len(l.Children) != 2 {
+		t.Fatalf("unexpected: %+v", l)
+	}
+	t0, ok := l.Children[0].(*Text)
+	if !ok || !t0.Bold {
+		t.Errorf("Children[0] should be bold *Text, got %T", l.Children[0])
+	}
+}
+
+func TestImageChildrenIsInlineNodeSlice(t *testing.T) {
+	raw := []byte(`{"type":"image","image":{"url":"/u/x.jpg","alternativeText":"alt"},"children":[
+		{"type":"text","text":""}
+	]}`)
+	var img Image
+	if err := json.Unmarshal(raw, &img); err != nil {
+		t.Fatal(err)
+	}
+	if img.Image.URL != "/u/x.jpg" {
+		t.Errorf("Image.URL = %q", img.Image.URL)
+	}
+	if len(img.Children) != 1 {
+		t.Errorf("len = %d", len(img.Children))
+	}
+}
+
+func TestLinkAndImageHandleInvalidShape(t *testing.T) {
+	// Hold coverage at 100% by exercising the UnmarshalJSON error path
+	// for both new types.
+	var l Link
+	if err := l.UnmarshalJSON([]byte(`"not an object"`)); err == nil {
+		t.Error("expected error for invalid link shape")
+	}
+	var img Image
+	if err := img.UnmarshalJSON([]byte(`"not an object"`)); err == nil {
+		t.Error("expected error for invalid image shape")
+	}
+}
+
+func TestLinkAndImagePropagateDecodeInlineError(t *testing.T) {
+	// children whose elements aren't objects → decodeInline error path.
+	var l Link
+	if err := l.UnmarshalJSON([]byte(`{"type":"link","url":"x","children":[123]}`)); err == nil {
+		t.Error("expected decodeInline error for link")
+	}
+	var img Image
+	if err := img.UnmarshalJSON([]byte(`{"type":"image","image":{},"children":[123]}`)); err == nil {
+		t.Error("expected decodeInline error for image")
+	}
+}
+
+func TestLinkAndImageHandleMissingChildren(t *testing.T) {
+	// Missing "children" key -> nil slice, no error. Exercises the empty-children
+	// short-circuit in both UnmarshalJSON implementations.
+	var l Link
+	if err := json.Unmarshal([]byte(`{"type":"link","url":"https://x"}`), &l); err != nil {
+		t.Fatal(err)
+	}
+	if l.URL != "https://x" || l.Children != nil {
+		t.Errorf("link = %+v", l)
+	}
+
+	var img Image
+	if err := json.Unmarshal([]byte(`{"type":"image","image":{"url":"/x.jpg"}}`), &img); err != nil {
+		t.Fatal(err)
+	}
+	if img.Image.URL != "/x.jpg" || img.Children != nil {
+		t.Errorf("image = %+v", img)
+	}
+}

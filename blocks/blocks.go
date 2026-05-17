@@ -167,11 +167,32 @@ func (c *Code) UnmarshalJSON(data []byte) error {
 // Link is a block-level link. (Strapi emits links at the block level in
 // addition to the text-modifier form.)
 type Link struct {
-	URL      string `json:"url"`
-	Children []Text `json:"children"`
+	URL      string       `json:"url"`
+	Children []InlineNode `json:"-"`
 }
 
 func (Link) nodeType() string { return "link" }
+
+func (l *Link) UnmarshalJSON(data []byte) error {
+	var aux struct {
+		URL      string          `json:"url"`
+		Children json.RawMessage `json:"children"`
+	}
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+	l.URL = aux.URL
+	if len(aux.Children) == 0 {
+		l.Children = nil
+		return nil
+	}
+	children, err := decodeInline(aux.Children)
+	if err != nil {
+		return err
+	}
+	l.Children = children
+	return nil
+}
 
 // EmbeddedImage is the inline image payload embedded in an Image block.
 type EmbeddedImage struct {
@@ -185,10 +206,31 @@ type EmbeddedImage struct {
 // Image is an inline image block.
 type Image struct {
 	Image    EmbeddedImage `json:"image"`
-	Children []Text        `json:"children"`
+	Children []InlineNode  `json:"-"`
 }
 
 func (Image) nodeType() string { return "image" }
+
+func (i *Image) UnmarshalJSON(data []byte) error {
+	var aux struct {
+		Image    EmbeddedImage   `json:"image"`
+		Children json.RawMessage `json:"children"`
+	}
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+	i.Image = aux.Image
+	if len(aux.Children) == 0 {
+		i.Children = nil
+		return nil
+	}
+	children, err := decodeInline(aux.Children)
+	if err != nil {
+		return err
+	}
+	i.Children = children
+	return nil
+}
 
 // Unknown preserves any block type the SDK doesn't recognize so consumers
 // can inspect or pass it through. Type carries the discriminator;
