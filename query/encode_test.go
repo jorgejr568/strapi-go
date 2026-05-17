@@ -62,3 +62,13 @@ func TestEncoderURLEncodesValueNotBrackets(t *testing.T) {
 		t.Fatalf("got %q\nwant %q", got, want)
 	}
 }
+
+func TestEncoderEmptyPathSegment(t *testing.T) {
+	// An empty path is a no-op key (just emits `=value`) — guard exists in writeKey.
+	var e encoder
+	e.add([]string{}, "stray")
+	got := e.String()
+	if got != "=stray" {
+		t.Fatalf("got %q want %q", got, "=stray")
+	}
+}
