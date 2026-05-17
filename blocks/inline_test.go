@@ -105,3 +105,36 @@ func TestInlineLinkUnmarshalDirect(t *testing.T) {
 		t.Errorf("unexpected: %+v", l)
 	}
 }
+
+func TestInlineNodeTypeMethodsReturnExpectedDiscriminators(t *testing.T) {
+	// Runtime invocation of inlineNodeType to lock in the discriminator
+	// strings (compile-time interface satisfaction doesn't execute the body).
+	if got := (Text{}).inlineNodeType(); got != "text" {
+		t.Errorf("Text.inlineNodeType() = %q want %q", got, "text")
+	}
+	if got := (InlineLink{}).inlineNodeType(); got != "link" {
+		t.Errorf("InlineLink.inlineNodeType() = %q want %q", got, "link")
+	}
+}
+
+func TestDecodeInlineEmptyArray(t *testing.T) {
+	got, err := decodeInline([]byte(`[]`))
+	if err != nil {
+		t.Fatalf("decodeInline: %v", err)
+	}
+	if got == nil {
+		t.Error("empty array should produce non-nil empty slice (for ergonomics, not nil)")
+	}
+	if len(got) != 0 {
+		t.Errorf("len = %d want 0", len(got))
+	}
+}
+
+func TestDecodeInlineErrorOnNonObjectElement(t *testing.T) {
+	// Each array element must be a JSON object so the type-discriminator
+	// probe succeeds. A bare number triggers the inner Unmarshal error.
+	_, err := decodeInline([]byte(`[123]`))
+	if err == nil {
+		t.Fatal("expected error for non-object element")
+	}
+}
