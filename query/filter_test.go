@@ -93,3 +93,37 @@ func TestFilterAndOrSkipNils(t *testing.T) {
 		t.Errorf("got %q want %q", got, want)
 	}
 }
+
+func TestAllComparisonOperators(t *testing.T) {
+	cases := []struct {
+		name   string
+		filter Filter
+		want   string
+	}{
+		{"EqI", EqI("title", "hello"), "filters%5Btitle%5D%5B%24eqi%5D=hello"},
+		{"Ne", Ne("status", "draft"), "filters%5Bstatus%5D%5B%24ne%5D=draft"},
+		{"Lt", Lt("views", 100), "filters%5Bviews%5D%5B%24lt%5D=100"},
+		{"Lte", Lte("views", 100), "filters%5Bviews%5D%5B%24lte%5D=100"},
+		{"Gte", Gte("views", 100), "filters%5Bviews%5D%5B%24gte%5D=100"},
+		{"Contains", Contains("title", "hi"), "filters%5Btitle%5D%5B%24contains%5D=hi"},
+		{"NotContains", NotContains("title", "hi"), "filters%5Btitle%5D%5B%24notContains%5D=hi"},
+		{"StartsWith", StartsWith("slug", "post-"), "filters%5Bslug%5D%5B%24startsWith%5D=post-"},
+		{"EndsWith", EndsWith("slug", "-draft"), "filters%5Bslug%5D%5B%24endsWith%5D=-draft"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			q := New(Where(tc.filter))
+			if got := q.Build(); got != tc.want {
+				t.Errorf("got %q want %q", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestFilterNotIn(t *testing.T) {
+	q := New(Where(NotIn("status", "archived", "deleted")))
+	want := "filters%5Bstatus%5D%5B%24notIn%5D%5B0%5D=archived&filters%5Bstatus%5D%5B%24notIn%5D%5B1%5D=deleted"
+	if got := q.Build(); got != want {
+		t.Fatalf("got %q want %q", got, want)
+	}
+}
