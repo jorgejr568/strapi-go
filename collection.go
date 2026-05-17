@@ -98,9 +98,9 @@ func Update[T any](ctx context.Context, c *Client, endpoint, documentID string, 
 	return NewCollection[T](c, endpoint).Update(ctx, documentID, attrs, opts...)
 }
 
-// Delete is a top-level convenience wrapper. The T type parameter is unused
-// at the call site but kept for symmetry with the other helpers; if you
-// don't care about T, pass `any`.
+// Delete is a top-level convenience wrapper. Unlike Find/List/Create/Update,
+// it is not generic — Strapi's delete endpoint returns no typed body, so
+// there is no T to infer.
 func Delete(ctx context.Context, c *Client, endpoint, documentID string) error {
 	return (&Collection[any]{client: c, endpoint: endpoint}).Delete(ctx, documentID)
 }
