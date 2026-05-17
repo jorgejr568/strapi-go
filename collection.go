@@ -53,3 +53,54 @@ func Find[T any](ctx context.Context, c *Client, endpoint, documentID string, op
 func List[T any](ctx context.Context, c *Client, endpoint string, opts ...query.Option) (*ListResponse[T], error) {
 	return NewCollection[T](c, endpoint).List(ctx, opts...)
 }
+
+// Create inserts a new entry. attrs is the user-defined content for the
+// entry (system fields are set by Strapi). The SDK wraps the payload as
+// {"data": <attrs>} automatically. Optional query options apply to the
+// returned representation (e.g. populate relations on the response).
+func (col *Collection[T]) Create(ctx context.Context, attrs T, opts ...query.Option) (*Document[T], error) {
+	q := query.New(opts...).Build()
+	var env single[T]
+	body := map[string]any{"data": attrs}
+	if err := col.client.do(ctx, http.MethodPost, "/api/"+col.endpoint, q, body, &env); err != nil {
+		return nil, err
+	}
+	return &env.Data, nil
+}
+
+// Update modifies an existing entry. attrs may be the full T or a partial
+// payload (e.g. map[string]any{"title": "new"}) so callers can update
+// individual fields without zeroing the rest. The SDK wraps the payload as
+// {"data": <attrs>} automatically.
+func (col *Collection[T]) Update(ctx context.Context, documentID string, attrs any, opts ...query.Option) (*Document[T], error) {
+	q := query.New(opts...).Build()
+	var env single[T]
+	body := map[string]any{"data": attrs}
+	if err := col.client.do(ctx, http.MethodPut, "/api/"+col.endpoint+"/"+documentID, q, body, &env); err != nil {
+		return nil, err
+	}
+	return &env.Data, nil
+}
+
+// Delete removes an entry by documentId. The Strapi response body, if any,
+// is discarded.
+func (col *Collection[T]) Delete(ctx context.Context, documentID string) error {
+	return col.client.do(ctx, http.MethodDelete, "/api/"+col.endpoint+"/"+documentID, "", nil, nil)
+}
+
+// Create is a top-level convenience wrapper.
+func Create[T any](ctx context.Context, c *Client, endpoint string, attrs T, opts ...query.Option) (*Document[T], error) {
+	return NewCollection[T](c, endpoint).Create(ctx, attrs, opts...)
+}
+
+// Update is a top-level convenience wrapper.
+func Update[T any](ctx context.Context, c *Client, endpoint, documentID string, attrs any, opts ...query.Option) (*Document[T], error) {
+	return NewCollection[T](c, endpoint).Update(ctx, documentID, attrs, opts...)
+}
+
+// Delete is a top-level convenience wrapper. The T type parameter is unused
+// at the call site but kept for symmetry with the other helpers; if you
+// don't care about T, pass `any`.
+func Delete(ctx context.Context, c *Client, endpoint, documentID string) error {
+	return (&Collection[any]{client: c, endpoint: endpoint}).Delete(ctx, documentID)
+}
