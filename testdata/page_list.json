@@ -1,0 +1,32 @@
+{
+  "data": [
+    {
+      "id": 1,
+      "documentId": "abc123documentidulid0001",
+      "title": "Home",
+      "slug": "home",
+      "createdAt": "2026-01-02T03:04:05.000Z",
+      "updatedAt": "2026-01-03T03:04:05.000Z",
+      "publishedAt": "2026-01-02T03:04:05.000Z",
+      "locale": "en"
+    },
+    {
+      "id": 2,
+      "documentId": "abc123documentidulid0002",
+      "title": "About",
+      "slug": "about",
+      "createdAt": "2026-01-02T03:04:05.000Z",
+      "updatedAt": "2026-01-03T03:04:05.000Z",
+      "publishedAt": null,
+      "locale": "en"
+    }
+  ],
+  "meta": {
+    "pagination": {
+      "page": 1,
+      "pageSize": 25,
+      "pageCount": 1,
+      "total": 2
+    }
+  }
+}
