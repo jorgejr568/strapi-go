@@ -104,3 +104,24 @@ func TestRenderHTMLTextModifiers(t *testing.T) {
 		t.Errorf("got %q want %q", got, want)
 	}
 }
+
+func TestRenderHTMLHeadingClampsLevel(t *testing.T) {
+	// Heading levels outside 1-6 should clamp to h2 to keep output valid HTML.
+	cases := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{"zero", `[{"type":"heading","level":0,"children":[{"type":"text","text":"x"}]}]`, "<h2>x</h2>"},
+		{"seven", `[{"type":"heading","level":7,"children":[{"type":"text","text":"x"}]}]`, "<h2>x</h2>"},
+		{"negative", `[{"type":"heading","level":-1,"children":[{"type":"text","text":"x"}]}]`, "<h2>x</h2>"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := renderFixture(t, tc.input)
+			if got != tc.want {
+				t.Errorf("got %q want %q", got, tc.want)
+			}
+		})
+	}
+}
