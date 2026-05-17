@@ -127,3 +127,55 @@ func TestDoDiscardsResponseWhenDstNil(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestDoErrorFallbackToUnknownErrorOnNonJSONBody(t *testing.T) {
+	srv := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		// Upstream proxy emits an HTML error page; SDK should synthesize
+		// an UnknownError with the raw body as Message.
+		w.Header().Set("Content-Type", "text/html")
+		w.WriteHeader(502)
+		_, _ = w.Write([]byte("<html><body>502 Bad Gateway</body></html>"))
+	})
+
+	c := New(WithBaseURL(srv.URL))
+	var out single[pageAttrs]
+	err := c.do(context.Background(), http.MethodGet, "/api/pages/abc", "", nil, &out)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	var se *Error
+	if !errors.As(err, &se) {
+		t.Fatalf("err = %v, expected *Error", err)
+	}
+	if se.Name != "UnknownError" {
+		t.Errorf("Name = %q want UnknownError", se.Name)
+	}
+	if se.Status != 502 {
+		t.Errorf("Status = %d want 502", se.Status)
+	}
+	if !strings.Contains(se.Message, "Bad Gateway") {
+		t.Errorf("Message %q should contain raw body", se.Message)
+	}
+}
+
+func TestDoErrorStatusBackfillWhenEnvelopeOmitsStatus(t *testing.T) {
+	// Envelope decodes but has Status==0; SDK should backfill from HTTP code.
+	srv := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(503)
+		_, _ = w.Write([]byte(`{"data":null,"error":{"name":"ServiceUnavailable","message":"db down"}}`))
+	})
+
+	c := New(WithBaseURL(srv.URL))
+	var out single[pageAttrs]
+	err := c.do(context.Background(), http.MethodGet, "/api/pages/abc", "", nil, &out)
+	var se *Error
+	if !errors.As(err, &se) {
+		t.Fatalf("err = %v", err)
+	}
+	if se.Status != 503 {
+		t.Errorf("Status = %d want 503 (backfilled from HTTP code)", se.Status)
+	}
+	if se.Name != "ServiceUnavailable" {
+		t.Errorf("Name = %q", se.Name)
+	}
+}

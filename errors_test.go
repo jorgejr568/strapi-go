@@ -45,3 +45,12 @@ func TestErrorDetailsPreserved(t *testing.T) {
 		t.Fatalf("details not preserved")
 	}
 }
+
+func TestErrorIsReturnsFalseForUnknownSentinel(t *testing.T) {
+	// errors.Is with a sentinel that Error.Is doesn't recognize returns false.
+	e := &Error{Status: 404, Name: "NotFoundError"}
+	other := errors.New("unrelated sentinel")
+	if errors.Is(e, other) {
+		t.Errorf("errors.Is(404 err, unrelated) should be false")
+	}
+}
