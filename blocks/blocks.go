@@ -30,22 +30,120 @@ func (Text) nodeType() string { return "text" }
 
 // Paragraph is a paragraph of inline children.
 type Paragraph struct {
-	Children []Text `json:"children"`
+	Children []InlineNode `json:"-"`
 }
 
 func (Paragraph) nodeType() string { return "paragraph" }
 
+// UnmarshalJSON decodes the "children" array into []InlineNode via the
+// shared inline dispatcher.
+func (p *Paragraph) UnmarshalJSON(data []byte) error {
+	var aux struct {
+		Children json.RawMessage `json:"children"`
+	}
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+	if len(aux.Children) == 0 {
+		p.Children = nil
+		return nil
+	}
+	children, err := decodeInline(aux.Children)
+	if err != nil {
+		return err
+	}
+	p.Children = children
+	return nil
+}
+
 // Heading is a heading element. Level is 1–6.
 type Heading struct {
-	Level    int    `json:"level"`
-	Children []Text `json:"children"`
+	Level    int          `json:"level"`
+	Children []InlineNode `json:"-"`
 }
 
 func (Heading) nodeType() string { return "heading" }
 
-// ListItem is an element inside a List.
+func (h *Heading) UnmarshalJSON(data []byte) error {
+	var aux struct {
+		Level    int             `json:"level"`
+		Children json.RawMessage `json:"children"`
+	}
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+	h.Level = aux.Level
+	if len(aux.Children) == 0 {
+		h.Children = nil
+		return nil
+	}
+	children, err := decodeInline(aux.Children)
+	if err != nil {
+		return err
+	}
+	h.Children = children
+	return nil
+}
+
+// ListItemChild is anything that can appear inside a list-item's children:
+// inline content (*Text, *InlineLink) and nested block-level lists (*List).
+// The interface is sealed to types in this package.
+type ListItemChild interface {
+	isListItemChild()
+}
+
+func (Text) isListItemChild()       {}
+func (InlineLink) isListItemChild() {}
+func (List) isListItemChild()       {}
+
+// ListItem is an element inside a List. Its Children can mix inline runs,
+// inline links, and nested lists (Strapi emits all three patterns).
 type ListItem struct {
-	Children []Text `json:"children"`
+	Children []ListItemChild `json:"-"`
+}
+
+// UnmarshalJSON decodes the "children" array by dispatching each item by
+// its "type" discriminator into the appropriate concrete type.
+func (li *ListItem) UnmarshalJSON(data []byte) error {
+	var aux struct {
+		Children []json.RawMessage `json:"children"`
+	}
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+	out := make([]ListItemChild, 0, len(aux.Children))
+	for _, raw := range aux.Children {
+		var head struct {
+			Type string `json:"type"`
+		}
+		if err := json.Unmarshal(raw, &head); err != nil {
+			return err
+		}
+		switch head.Type {
+		case "text":
+			var n Text
+			if err := json.Unmarshal(raw, &n); err != nil {
+				return err
+			}
+			out = append(out, &n)
+		case "link":
+			var n InlineLink
+			if err := json.Unmarshal(raw, &n); err != nil {
+				return err
+			}
+			out = append(out, &n)
+		case "list":
+			var n List
+			if err := json.Unmarshal(raw, &n); err != nil {
+				return err
+			}
+			out = append(out, &n)
+		default:
+			// Drop unknowns silently.
+		}
+	}
+	li.Children = out
+	return nil
 }
 
 // List is an ordered or unordered list.
@@ -72,26 +170,85 @@ func (l *List) UnmarshalJSON(data []byte) error {
 
 // Quote is a block quotation.
 type Quote struct {
-	Children []Text `json:"children"`
+	Children []InlineNode `json:"-"`
 }
 
 func (Quote) nodeType() string { return "quote" }
 
+func (q *Quote) UnmarshalJSON(data []byte) error {
+	var aux struct {
+		Children json.RawMessage `json:"children"`
+	}
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+	if len(aux.Children) == 0 {
+		q.Children = nil
+		return nil
+	}
+	children, err := decodeInline(aux.Children)
+	if err != nil {
+		return err
+	}
+	q.Children = children
+	return nil
+}
+
 // Code is a code block.
 type Code struct {
-	Children []Text `json:"children"`
+	Children []InlineNode `json:"-"`
 }
 
 func (Code) nodeType() string { return "code" }
 
+func (c *Code) UnmarshalJSON(data []byte) error {
+	var aux struct {
+		Children json.RawMessage `json:"children"`
+	}
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+	if len(aux.Children) == 0 {
+		c.Children = nil
+		return nil
+	}
+	children, err := decodeInline(aux.Children)
+	if err != nil {
+		return err
+	}
+	c.Children = children
+	return nil
+}
+
 // Link is a block-level link. (Strapi emits links at the block level in
 // addition to the text-modifier form.)
 type Link struct {
-	URL      string `json:"url"`
-	Children []Text `json:"children"`
+	URL      string       `json:"url"`
+	Children []InlineNode `json:"-"`
 }
 
 func (Link) nodeType() string { return "link" }
+
+func (l *Link) UnmarshalJSON(data []byte) error {
+	var aux struct {
+		URL      string          `json:"url"`
+		Children json.RawMessage `json:"children"`
+	}
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+	l.URL = aux.URL
+	if len(aux.Children) == 0 {
+		l.Children = nil
+		return nil
+	}
+	children, err := decodeInline(aux.Children)
+	if err != nil {
+		return err
+	}
+	l.Children = children
+	return nil
+}
 
 // EmbeddedImage is the inline image payload embedded in an Image block.
 type EmbeddedImage struct {
@@ -105,10 +262,31 @@ type EmbeddedImage struct {
 // Image is an inline image block.
 type Image struct {
 	Image    EmbeddedImage `json:"image"`
-	Children []Text        `json:"children"`
+	Children []InlineNode  `json:"-"`
 }
 
 func (Image) nodeType() string { return "image" }
+
+func (i *Image) UnmarshalJSON(data []byte) error {
+	var aux struct {
+		Image    EmbeddedImage   `json:"image"`
+		Children json.RawMessage `json:"children"`
+	}
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+	i.Image = aux.Image
+	if len(aux.Children) == 0 {
+		i.Children = nil
+		return nil
+	}
+	children, err := decodeInline(aux.Children)
+	if err != nil {
+		return err
+	}
+	i.Children = children
+	return nil
+}
 
 // Unknown preserves any block type the SDK doesn't recognize so consumers
 // can inspect or pass it through. Type carries the discriminator;

@@ -22,9 +22,6 @@ Not yet:
 - File uploads
 - Dynamic-zone typed registry
 - Markdown renderer for blocks
-- Inline links and nested lists inside rich-text bodies are decoded as
-  plain text only — the `Children` fields on inline-bearing block types
-  are typed `[]Text` for MVP simplicity.
 
 Note: the list envelope returned by `Collection[T].List` and the
 top-level `List[T]` helper is `*ListResponse[T]`. (Go places types and
@@ -188,12 +185,23 @@ if errors.As(err, &se) {
 AST. Pass it to `blocks.RenderHTML` for a minimal escaped HTML
 serialization, or walk it yourself for custom rendering.
 
-**Limitation:** the MVP types `Paragraph.Children`, `Heading.Children`,
-`ListItem.Children`, `Quote.Children`, `Code.Children`, `Link.Children`,
-and `Image.Children` are all `[]Text`. Non-Text inline nodes (e.g. an
-inline link inside a paragraph, or a nested list inside a list-item) are
-silently dropped during JSON decode. A future version will sealed-sum-type
-the inline AST.
+The inline content of `Paragraph`, `Heading`, `Quote`, `Code`, `Link`,
+and `Image` children is decoded as `[]blocks.InlineNode` (sealed by the
+package): the concrete types are `*blocks.Text` for plain runs (with
+bold/italic/etc. modifiers) and `*blocks.InlineLink` for inline
+hyperlinks. List-item children additionally accept `*blocks.List` for
+nested lists. Use type assertions to access concrete fields:
+
+```go
+for _, child := range para.Children {
+    switch n := child.(type) {
+    case *blocks.Text:
+        fmt.Println(n.Text, n.Bold)
+    case *blocks.InlineLink:
+        fmt.Println(n.URL, n.Children[0].Text)
+    }
+}
+```
 
 ## Examples
 

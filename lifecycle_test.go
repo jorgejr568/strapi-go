@@ -414,6 +414,19 @@ func TestBlocksRoundtrip(t *testing.T) {
                     {"type":"list","format":"ordered","children":[
                         {"type":"list-item","children":[{"type":"text","text":"one"}]}
                     ]},
+                    {"type":"paragraph","children":[
+                        {"type":"text","text":"with "},
+                        {"type":"link","url":"https://example.com/docs","children":[{"type":"text","text":"inline link"}]},
+                        {"type":"text","text":" here"}
+                    ]},
+                    {"type":"list","format":"unordered","children":[
+                        {"type":"list-item","children":[
+                            {"type":"text","text":"outer "},
+                            {"type":"list","format":"unordered","children":[
+                                {"type":"list-item","children":[{"type":"text","text":"nested"}]}
+                            ]}
+                        ]}
+                    ]},
                     {"type":"quote","children":[{"type":"text","text":"quoted"}]},
                     {"type":"code","children":[{"type":"text","text":"go run ."}]},
                     {"type":"link","url":"https://example.com","children":[{"type":"text","text":"site"}]},
@@ -431,8 +444,8 @@ func TestBlocksRoundtrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Find: %v", err)
 	}
-	if len(page.Attributes.Body) != 9 {
-		t.Fatalf("body len = %d want 9", len(page.Attributes.Body))
+	if len(page.Attributes.Body) != 11 {
+		t.Fatalf("body len = %d want 11", len(page.Attributes.Body))
 	}
 
 	html := blocks.RenderHTML(page.Attributes.Body)
@@ -445,6 +458,10 @@ func TestBlocksRoundtrip(t *testing.T) {
 		"<strong><em> both</em></strong>",
 		"<ul><li>first</li><li>second</li></ul>",
 		"<ol><li>one</li></ol>",
+		// New: inline link inside paragraph
+		`<a href="https://example.com/docs">inline link</a>`,
+		// New: nested list inside list-item
+		`<ul><li>outer <ul><li>nested</li></ul></li></ul>`,
 		"<blockquote>quoted</blockquote>",
 		"<pre><code>go run .</code></pre>",
 		`<a href="https://example.com">site</a>`,
