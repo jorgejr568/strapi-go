@@ -121,3 +121,62 @@ func TestNormalizeV4NullRelationEnvelope(t *testing.T) {
 	}
 	assertJSONEqual(t, got, want)
 }
+
+func TestNormalizeV4ListResponse(t *testing.T) {
+	in := []byte(`{
+		"data": [
+			{ "id": 1, "attributes": { "title": "A" } },
+			{ "id": 2, "attributes": { "title": "B" } }
+		],
+		"meta": { "pagination": { "page": 1, "pageSize": 25, "pageCount": 1, "total": 2 } }
+	}`)
+	want := []byte(`{
+		"data": [
+			{ "id": 1, "title": "A" },
+			{ "id": 2, "title": "B" }
+		],
+		"meta": { "pagination": { "page": 1, "pageSize": 25, "pageCount": 1, "total": 2 } }
+	}`)
+	got, err := normalizeV4ToV5(in)
+	if err != nil {
+		t.Fatalf("normalize: %v", err)
+	}
+	assertJSONEqual(t, got, want)
+}
+
+func TestNormalizeV4DeepNestedPopulate(t *testing.T) {
+	in := []byte(`{
+		"data": {
+			"id": 1,
+			"attributes": {
+				"title": "Post",
+				"author": { "data": {
+					"id": 5,
+					"attributes": {
+						"name": "Alice",
+						"avatar": { "data": {
+							"id": 9,
+							"attributes": { "url": "/uploads/alice.png", "name": "alice.png" }
+						} }
+					}
+				} }
+			}
+		}
+	}`)
+	want := []byte(`{
+		"data": {
+			"id": 1,
+			"title": "Post",
+			"author": {
+				"id": 5,
+				"name": "Alice",
+				"avatar": { "id": 9, "url": "/uploads/alice.png", "name": "alice.png" }
+			}
+		}
+	}`)
+	got, err := normalizeV4ToV5(in)
+	if err != nil {
+		t.Fatalf("normalize: %v", err)
+	}
+	assertJSONEqual(t, got, want)
+}
