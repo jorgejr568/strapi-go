@@ -144,6 +144,62 @@ func TestNormalizeV4ListResponse(t *testing.T) {
 	assertJSONEqual(t, got, want)
 }
 
+func TestNormalizeV4InvalidJSON(t *testing.T) {
+	_, err := normalizeV4ToV5([]byte(`{not valid`))
+	if err == nil {
+		t.Fatal("expected error for invalid JSON, got nil")
+	}
+}
+
+func TestNormalizeV4NoDataKey(t *testing.T) {
+	// A response without a top-level "data" key (e.g. a bare error envelope)
+	// should still walk and not crash — the normalizer is only called on 2xx
+	// responses in production, but we don't want it to panic on edge inputs.
+	in := []byte(`{"foo": "bar"}`)
+	got, err := normalizeV4ToV5(in)
+	if err != nil {
+		t.Fatalf("normalize: %v", err)
+	}
+	assertJSONEqual(t, got, []byte(`{"foo": "bar"}`))
+}
+
+func TestNormalizeV4EmptyDataObject(t *testing.T) {
+	in := []byte(`{"data": {}, "meta": {}}`)
+	got, err := normalizeV4ToV5(in)
+	if err != nil {
+		t.Fatalf("normalize: %v", err)
+	}
+	assertJSONEqual(t, got, []byte(`{"data": {}, "meta": {}}`))
+}
+
+func TestNormalizeV4PreservesScalarFieldsOnEntry(t *testing.T) {
+	// id is an int, locale is a string, publishedAt is null — all should be
+	// preserved with their types through the round-trip.
+	in := []byte(`{
+		"data": {
+			"id": 42,
+			"attributes": {
+				"title": "X",
+				"publishedAt": null,
+				"locale": "en"
+			}
+		}
+	}`)
+	want := []byte(`{
+		"data": {
+			"id": 42,
+			"title": "X",
+			"publishedAt": null,
+			"locale": "en"
+		}
+	}`)
+	got, err := normalizeV4ToV5(in)
+	if err != nil {
+		t.Fatalf("normalize: %v", err)
+	}
+	assertJSONEqual(t, got, want)
+}
+
 func TestNormalizeV4DeepNestedPopulate(t *testing.T) {
 	in := []byte(`{
 		"data": {
