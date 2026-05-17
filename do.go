@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 )
 
@@ -21,6 +22,9 @@ import (
 //   - body:     any value to JSON-encode as the request body, or nil
 //   - dst:      target for 2xx response decoding, or nil to discard
 func (c *Client) do(ctx context.Context, method, path, rawQuery string, body, dst any) error {
+	if c.apiVersion == APIVersionV4 {
+		rawQuery = translateStatusToPublicationState(rawQuery)
+	}
 	url := c.baseURL + path
 	if rawQuery != "" {
 		if strings.Contains(url, "?") {
@@ -100,4 +104,38 @@ func decodeError(status int, body []byte) error {
 		Name:    "UnknownError",
 		Message: strings.TrimSpace(string(body)),
 	}
+}
+
+// translateStatusToPublicationState rewrites a v5-shaped status= param to
+// its v4 publicationState= equivalent in the given raw query string. It is
+// a no-op when the query is empty or no status param is present.
+//
+// Mapping:
+//
+//	status=draft     → publicationState=preview  (v4: preview returns drafts AND published)
+//	status=published → publicationState=live     (v4: live = published only)
+//
+// Note: v4 has no "drafts only" mode — preview is the closest equivalent.
+func translateStatusToPublicationState(rawQuery string) string {
+	if rawQuery == "" {
+		return rawQuery
+	}
+	values, err := url.ParseQuery(rawQuery)
+	if err != nil {
+		return rawQuery
+	}
+	status := values.Get("status")
+	if status == "" {
+		return rawQuery
+	}
+	switch status {
+	case "draft":
+		values.Set("publicationState", "preview")
+	case "published":
+		values.Set("publicationState", "live")
+	default:
+		return rawQuery
+	}
+	values.Del("status")
+	return values.Encode()
 }

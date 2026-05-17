@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -281,5 +282,61 @@ func TestDoV4ResponseIsNormalizedBeforeUnmarshal(t *testing.T) {
 	}
 	if out.Data.Attributes.Slug != "from-v4" {
 		t.Errorf("Slug = %q", out.Data.Attributes.Slug)
+	}
+}
+
+func TestDoV4TranslatesStatusToPublicationState(t *testing.T) {
+	cases := []struct {
+		name    string
+		inQuery string
+		wantKey string // key that must appear in the outgoing query
+		wantVal string
+	}{
+		{"draft", "status=draft", "publicationState", "preview"},
+		{"published", "status=published", "publicationState", "live"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var gotQuery string
+			srv := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+				gotQuery = r.URL.RawQuery
+				_, _ = w.Write([]byte(`{"data": null, "meta": {}}`))
+			})
+
+			c := New(WithBaseURL(srv.URL), WithAPIVersion(APIVersionV4))
+			if err := c.do(context.Background(), http.MethodGet, "/api/pages", tc.inQuery, nil, nil); err != nil {
+				t.Fatalf("do: %v", err)
+			}
+			parsed, err := url.ParseQuery(gotQuery)
+			if err != nil {
+				t.Fatalf("parse query: %v", err)
+			}
+			if got := parsed.Get(tc.wantKey); got != tc.wantVal {
+				t.Errorf("%s=%q (got %q); full query = %q", tc.wantKey, tc.wantVal, got, gotQuery)
+			}
+			if parsed.Get("status") != "" {
+				t.Errorf("status should be stripped in v4 mode; got %q", parsed.Get("status"))
+			}
+		})
+	}
+}
+
+func TestDoV5DoesNotRewriteStatus(t *testing.T) {
+	var gotQuery string
+	srv := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		gotQuery = r.URL.RawQuery
+		_, _ = w.Write([]byte(`{"data": null, "meta": {}}`))
+	})
+
+	c := New(WithBaseURL(srv.URL)) // default v5
+	if err := c.do(context.Background(), http.MethodGet, "/api/pages", "status=draft", nil, nil); err != nil {
+		t.Fatalf("do: %v", err)
+	}
+	parsed, _ := url.ParseQuery(gotQuery)
+	if parsed.Get("status") != "draft" {
+		t.Errorf("v5: status should be passed through, got %q", parsed.Get("status"))
+	}
+	if parsed.Get("publicationState") != "" {
+		t.Errorf("v5: publicationState should not appear, got %q", parsed.Get("publicationState"))
 	}
 }
