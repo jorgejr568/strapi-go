@@ -138,3 +138,20 @@ func TestDecodeInlineErrorOnNonObjectElement(t *testing.T) {
 		t.Fatal("expected error for non-object element")
 	}
 }
+
+func TestDecodeInlineErrorOnMalformedTextBody(t *testing.T) {
+	// type="text" matches but the body has a wrong-typed field that fails
+	// the inner Unmarshal. Covers the per-case error path in the switch.
+	_, err := decodeInline([]byte(`[{"type":"text","text":123}]`))
+	if err == nil {
+		t.Fatal("expected error for malformed text body")
+	}
+}
+
+func TestDecodeInlineErrorOnMalformedLinkBody(t *testing.T) {
+	// type="link" matches but the body has a wrong-typed url field.
+	_, err := decodeInline([]byte(`[{"type":"link","url":123,"children":[]}]`))
+	if err == nil {
+		t.Fatal("expected error for malformed link body")
+	}
+}
